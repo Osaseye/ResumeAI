@@ -6,12 +6,35 @@ import { jobsService } from '@/features/jobs/services/jobService';
 import type { Job } from '@/features/jobs/services/jobService';
 import type { Resume } from './types';
 import { toast } from 'sonner';
+import { ResumePreview } from './components/ResumePreview';
 
 export const ResumeDetailsPage = () => {
     const { id } = useParams();
     const [resume, setResume] = useState<Resume | null>(null);
     const [recommendedJobs, setRecommendedJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isUpdatingTemplate, setIsUpdatingTemplate] = useState(false);
+
+    const handleTemplateChange = async (newTemplate: Resume['template']) => {
+        if (!resume || isUpdatingTemplate) return;
+        
+        // Optimistic update
+        const previousTemplate = resume.template;
+        setResume(prev => prev ? { ...prev, template: newTemplate } : null);
+        setIsUpdatingTemplate(true);
+
+        try {
+            await resumeService.updateResume(resume.id, { template: newTemplate });
+            toast.success("Template updated successfully");
+        } catch (error) {
+            console.error("Failed to update template:", error);
+            toast.error("Failed to update template");
+            // Revert on failure
+             setResume(prev => prev ? { ...prev, template: previousTemplate } : null);
+        } finally {
+            setIsUpdatingTemplate(false);
+        }
+    };
 
     useEffect(() => {
         const fetchResume = async () => {
@@ -77,6 +100,18 @@ export const ResumeDetailsPage = () => {
                         </span>
                     </div>
                     <div className="flex gap-3">
+                        <select 
+                            value={resume.template || 'professional'} 
+                            onChange={(e) => handleTemplateChange(e.target.value as any)}
+                            disabled={isUpdatingTemplate}
+                            className="px-3 py-2 border border-blue-500 rounded-lg text-blue-800 font-medium bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer hover:bg-blue-100 transition-colors"
+                        >
+                            <option value="professional">Professional</option>
+                            <option value="modern">Modern</option>
+                            <option value="creative">Creative</option>
+                            <option value="simple">Simple</option>
+                            <option value="tech">Tech</option>
+                        </select>
                         <button className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50 flex items-center gap-2">
                              <span className="material-symbols-outlined text-sm">download</span>
                             Download PDF
@@ -91,75 +126,10 @@ export const ResumeDetailsPage = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full overflow-hidden">
                     {/* Left: Resume Preview (Scrollable) */}
                     <div className="lg:col-span-2 bg-gray-100 rounded-2xl p-8 overflow-y-auto border border-gray-200 shadow-inner">
-                        <div className="bg-white max-w-[800px] mx-auto min-h-[1000px] shadow-sm p-12">
-                             {/* Resume Content */}
-                             <div className="text-center border-b border-gray-200 pb-8 mb-8">
-                                <h1 className="text-3xl font-bold text-gray-900 mb-2">{resume.contact.fullName}</h1>
-                                <p className="text-gray-600">{resume.headline}</p>
-                                <div className="flex justify-center gap-4 text-sm text-gray-500 mt-4 flex-wrap">
-                                    {resume.contact.location && <span>{resume.contact.location}</span>}
-                                    {resume.contact.location && <span>•</span>}
-                                    <span>{resume.contact.email}</span>
-                                    {resume.contact.website && (
-                                        <>
-                                            <span>•</span>
-                                            <span>{resume.contact.website}</span>
-                                        </>
-                                    )}
-                                </div>
-                             </div>
-
-                             <div className="mb-8">
-                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-200 pb-2 mb-4">Professional Summary</h3>
-                                <p className="text-sm text-gray-700 leading-relaxed">
-                                    {resume.summary}
-                                </p>
-                             </div>
-
-                             <div className="mb-8">
-                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-200 pb-2 mb-4">Work Experience</h3>
-                                <div className="space-y-6">
-                                    {resume.experience.map((exp) => (
-                                        <div key={exp.id}>
-                                            <div className="flex justify-between mb-1">
-                                                <h4 className="font-bold text-gray-900">{exp.role}</h4>
-                                                <span className="text-sm text-gray-500">{exp.startDate} - {exp.current ? 'Present' : exp.endDate}</span>
-                                            </div>
-                                            <p className="text-sm text-gray-700 font-medium mb-2">{exp.company}, {exp.location}</p>
-                                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{exp.description}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                             </div>
-
-                             <div className="mb-8">
-                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-200 pb-2 mb-4">Education</h3>
-                                <div className="space-y-4">
-                                    {resume.education.map((edu) => (
-                                        <div key={edu.id}>
-                                            <div className="flex justify-between mb-1">
-                                                <h4 className="font-bold text-gray-900">{edu.school}</h4>
-                                                <span className="text-sm text-gray-500">{edu.startDate} - {edu.current ? 'Present' : edu.endDate}</span>
-                                            </div>
-                                            <p className="text-sm text-gray-700">{edu.degree} in {edu.field}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                             </div>
-
-                             <div className="mb-8">
-                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-200 pb-2 mb-4">Skills</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {resume.skills.map((skill) => (
-                                        <span key={skill.id} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-xs font-medium border border-gray-200">
-                                            {skill.name}
-                                        </span>
-                                    ))}
-                                </div>
-                             </div>
+                         <div className="flex justify-center min-h-[1000px]">
+                            <ResumePreview data={resume} template={resume.template || 'professional'} />
                         </div>
                     </div>
-
                     {/* Right: Insights & Jobs (Scrollable) */}
                     <div className="lg:col-span-1 space-y-6 overflow-y-auto pr-2">
                         {/* AI Insights Card */}

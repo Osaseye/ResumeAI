@@ -5,9 +5,10 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { toast } from 'sonner';
 import { coverLetterService } from './services/coverLetterService';
 import { vertexService } from '@/features/ai/services/vertexService';
+import { CoverLetterPreview } from './components/CoverLetterPreview';
 import type { CoverLetterFormData } from './types';
 
-const steps = ['Job Details', 'Recipient', 'Intro', 'Body', 'Conclusion', 'Review'];
+const steps = ['Job Details', 'Recipient', 'Intro', 'Body', 'Conclusion', 'Template', 'Finalize'];
 
 export const CoverLetterBuilderPage = () => {
     const navigate = useNavigate();
@@ -17,6 +18,7 @@ export const CoverLetterBuilderPage = () => {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [selectedTemplate, setSelectedTemplate] = useState<'professional' | 'modern' | 'creative' | 'simple' | 'tech'>('professional');
     
     // Form Data State
     const [formData, setFormData] = useState<CoverLetterFormData>(() => {
@@ -341,15 +343,52 @@ export const CoverLetterBuilderPage = () => {
                         )}
 
                         {currentStep === 5 && (
-                             <div className="text-center py-12 animate-in fade-in slide-in-from-right-4 duration-300">
-                                <h3 className="text-xl font-bold text-gray-900 mb-4">You're almost done!</h3>
-                                <div className="bg-gray-50 p-6 rounded-lg text-left border border-gray-200 mb-6 font-serif text-sm leading-relaxed max-h-60 overflow-y-auto">
-                                    <p className="mb-4">Dear {formData.recipientName || 'Hiring Manager'},</p>
-                                    <p className="mb-4">{formData.content.intro}</p>
-                                    <p className="mb-4 whitespace-pre-line">{formData.content.body}</p>
-                                    <p className="mb-4">{formData.content.conclusion}</p>
-                                    <p>Sincerely,<br/>Your Name</p>
+                            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                                <h2 className="text-xl font-bold text-gray-900 mb-6">Choose a Template</h2>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+                                    {(['professional', 'modern', 'creative', 'simple', 'tech'] as const).map((t) => (
+                                        <button
+                                            key={t}
+                                            onClick={() => setSelectedTemplate(t)}
+                                            className={`p-4 border-2 rounded-xl text-left transition-all hover:border-black ${selectedTemplate === t ? 'border-black bg-gray-50 ring-1 ring-black' : 'border-gray-200'}`}
+                                        >
+                                            <div className="h-20 bg-white border border-gray-100 mb-3 shadow-sm flex items-center justify-center overflow-hidden relative">
+                                                <div className="w-full h-full p-2 opacity-50 space-y-1 transform scale-75 origin-top">
+                                                     <div className="h-2 bg-gray-800 w-1/3 mb-2 rounded-sm"></div>
+                                                     <div className="h-1 bg-gray-300 w-full rounded-sm"></div>
+                                                     <div className="h-1 bg-gray-300 w-full rounded-sm"></div>
+                                                     <div className="h-1 bg-gray-300 w-2/3 rounded-sm"></div>
+                                                </div>
+                                                {selectedTemplate === t && (
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/5">
+                                                        <span className="material-symbols-outlined text-black font-bold">check</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <span className="capitalize font-semibold text-gray-900 block">{t}</span>
+                                        </button>
+                                    ))}
                                 </div>
+                                
+                                <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50 p-4">
+                                     <h3 className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wider">Live Preview</h3>
+                                     <div className="transform scale-[0.6] origin-top h-[600px] overflow-y-auto border border-gray-300 shadow-lg">
+                                        <CoverLetterPreview data={formData} template={selectedTemplate} />
+                                     </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {currentStep === 6 && (
+                             <div className="text-center py-12 animate-in fade-in slide-in-from-right-4 duration-300">
+                                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <span className="material-symbols-outlined text-green-600 text-4xl">check_circle</span>
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">Cover Letter Ready!</h3>
+                                <p className="text-gray-500 mb-8 max-w-md mx-auto">
+                                    Your <strong>{selectedTemplate}</strong> style cover letter is ready to go.
+                                </p>
+                                
                                 <div className="flex justify-center gap-4">
                                     <button 
                                         onClick={handleSave}

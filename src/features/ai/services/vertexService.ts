@@ -31,6 +31,52 @@ export const vertexService = {
         }
     },
 
+    async improveResumeFromJob(resumeText: string, jobDescription: string): Promise<ResumeFormData> {
+        const prompt = `
+        You are an expert resume writer and ATS specialist. 
+        Analyze the following resume text and rewrite it into a structured JSON format to better match the provided job description.
+        
+        Job Description:
+        ${jobDescription}
+
+        Current Resume Text:
+        ${resumeText}
+
+        Instructions:
+        1. Parse the resume text into the following JSON structure:
+           {
+             "title": "Optimized Resume for [Job Title]",
+             "headline": "Professional Headline",
+             "contact": { "fullName": "Name", "email": "Email", "phone": "Phone", "location": "Location", "linkedin": "", "website": "" },
+             "summary": "Compelling summary tailored to the job description...",
+             "experience": [ { "id": "1", "role": "Job Title", "company": "Company", "location": "Location", "startDate": "YYYY-MM", "endDate": "YYYY-MM", "current": boolean, "description": "Bullet points..." } ],
+             "education": [ { "id": "1", "school": "School", "degree": "Degree", "field": "Field", "location": "Location", "startDate": "YYYY-MM", "endDate": "YYYY-MM", "current": boolean } ],
+             "skills": [ { "id": "1", "name": "Skill" } ],
+             "projects": []
+           }
+        2. Rewrite bullet points and summary to include keywords from the job description naturally.
+        3. Improve the impact of the resume by using stronger action verbs.
+        5. Use "2020-01" format for dates or "Present".
+        4. Return ONLY the valid JSON object. Do not add markdown formatting or explanations.
+        `;
+
+        try {
+            const result = await model.generateContent(prompt);
+            const response = result.response;
+            const text = response.text();
+            
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error("Failed to parse AI response as JSON");
+            }
+            
+            return JSON.parse(jsonMatch[0]);
+        } catch (error) {
+            console.error("Error optimizing resume with Vertex AI:", error);
+            throw error;
+        }
+    },
+
     async generateCoverLetter(jobTitle: string, company: string, description: string): Promise<{ intro: string, body: string, conclusion: string }> {
         const prompt = `
         Write a professional cover letter for a ${jobTitle} position at ${company}.

@@ -32,6 +32,7 @@ export interface Resume {
   id: string;
   userId: string;
   title: string;
+  template?: 'professional' | 'modern' | 'creative' | 'simple' | 'tech';
   headline?: string;
   createdAt: string; // ISO string
   updatedAt: string; // ISO string

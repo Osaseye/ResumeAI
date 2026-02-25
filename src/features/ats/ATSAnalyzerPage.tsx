@@ -1,10 +1,14 @@
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { fileParser } from '@/services/fileParser';
 import { vertexService } from '@/features/ai/services/vertexService';
+import { resumeService } from '@/features/resumes/services/resumeService';
+import { useAuth } from '@/features/auth/AuthContext';
+import { ResumePreview } from '@/features/resumes/components/ResumePreview';
+import type { ResumeFormData } from '@/features/resumes/types';
 
 interface ATSAnalysisResult {
     score: number;
@@ -17,6 +21,8 @@ interface ATSAnalysisResult {
 
 export const ATSAnalyzerPage = () => {
     const location = useLocation();
+    const navigate = useNavigate();
+    const { user } = useAuth();
     
     // Initialize with state from Job Board if available
     const [file, setFile] = useState<File | null>(null);
@@ -24,6 +30,10 @@ export const ATSAnalyzerPage = () => {
     const [analyzing, setAnalyzing] = useState(false);
     const [step, setStep] = useState(1); // 1: Upload, 2: Job Target, 3: Results
     const [result, setResult] = useState<ATSAnalysisResult | null>(null);
+    const [isOptimizing, setIsOptimizing] = useState(false);
+    const [optimizedResume, setOptimizedResume] = useState<ResumeFormData | null>(null);
+    const [originalText, setOriginalText] = useState<string>('');
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (location.state?.jobDescription) {
@@ -43,6 +53,35 @@ export const ATSAnalyzerPage = () => {
         maxFiles: 1
     });
 
+    const handleOptimize = async () => {
+        setIsOptimizing(true);
+        try {
+            const improvedData = await vertexService.improveResumeFromJob(originalText, jobDescription);
+            setOptimizedResume(improvedData);
+            toast.success("Resume optimized successfully!");
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to optimize resume.");
+        } finally {
+            setIsOptimizing(false);
+        }
+    };
+
+    const handleSaveOptimized = async () => {
+        if (!user || !optimizedResume) return;
+        setIsSaving(true);
+        try {
+            await resumeService.createResume(user.uid, optimizedResume);
+            toast.success("Optimized resume saved to dashboard!");
+            navigate('/dashboard');
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to save resume.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handleAnalyze = async () => {
         if (!file || !jobDescription.trim()) {
             toast.error("Please provide both a resume and a job description.");
@@ -53,6 +92,7 @@ export const ATSAnalyzerPage = () => {
         try {
             // 1. Extract text from resume
             const resumeText = await fileParser.extractText(file);
+            setOriginalText(resumeText);
             
             // 2. Analyze with AI
             const analysis = await vertexService.analyzeMatch(resumeText, jobDescription);
@@ -67,6 +107,8 @@ export const ATSAnalyzerPage = () => {
             setAnalyzing(false);
         }
     };
+
+
 
     const getScoreColor = (score: number) => {
         if (score >= 80) return 'text-green-500';
@@ -254,6 +296,76 @@ export const ATSAnalyzerPage = () => {
                                     {result.missingKeywords.length > 0 && (
                                         <p className="text-xs text-gray-500 mt-3 pl-8">
                                             Tip: Try incorporating these keywords into your skills or experience sections naturally.
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Optimization Section */}
+                                <div className="border-t border-gray-100 pt-8 mt-8">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-purple-600">auto_fix_high</span>
+                                            AI Resume Optimizer
+                                        </h3>
+                                        {!optimizedResume && !isOptimizing && (
+                                            <button 
+                                                onClick={handleOptimize}
+                                                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium text-sm hover:opacity-90 transition shadow-md"
+                                            >
+                                                Optimize for this Job
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {isOptimizing && (
+                                         <div className="bg-purple-50 rounded-xl p-6 text-center">
+                                            <div className="w-8 h-8 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-3"></div>
+                                            <p className="text-purple-700 font-medium">Analyzing job description and rewriting resume...</p>
+                                        </div>
+                                    )}
+
+                                    {optimizedResume && (
+                                        <div className="space-y-4">
+                                            <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                                                <div className="flex border-b border-gray-200">
+                                                    <div className="w-1/2 p-3 bg-gray-100 text-center font-semibold text-gray-600 border-r border-gray-200">Original</div>
+                                                    <div className="w-1/2 p-3 bg-purple-50 text-center font-semibold text-purple-700">Preview Optimized</div>
+                                                </div>
+                                                <div className="flex h-[500px]">
+                                                    <div className="w-1/2 p-4 overflow-y-auto text-sm text-gray-600 border-r border-gray-200 font-mono whitespace-pre-wrap">
+                                                        {originalText}
+                                                    </div>
+                                                    <div className="w-1/2 p-4 overflow-y-auto bg-purple-50/10">
+                                                        <div className="transform scale-[0.6] origin-top h-[900px] w-[166%] overflow-y-visible">
+                                                            <ResumePreview data={optimizedResume} template="professional" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="flex justify-end gap-3">
+                                                <button 
+                                                    onClick={() => setOptimizedResume(null)}
+                                                    className="px-4 py-2 text-gray-500 hover:text-gray-700 font-medium"
+                                                >
+                                                    Discard
+                                                </button>
+                                                <button 
+                                                    onClick={handleSaveOptimized}
+                                                    disabled={isSaving}
+                                                    className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 shadow-sm flex items-center gap-2"
+                                                >
+                                                    <span className="material-symbols-outlined text-[18px]">save_alt</span>
+                                                    {isSaving ? 'Saving...' : 'Save Optimized Resume'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {!isOptimizing && !optimizedResume && (
+                                        <p className="text-sm text-gray-500">
+                                            Click "Optimize for this Job" to let our AI rewrite your resume tailored specifically to the job description above.
+                                            It will highlight relevant skills and adjust your experience descriptions.
                                         </p>
                                     )}
                                 </div>
