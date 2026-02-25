@@ -1,5 +1,6 @@
 import { DashboardLayout } from '@/layouts/DashboardLayout';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { fileParser } from '@/services/fileParser';
@@ -17,11 +18,20 @@ interface ATSAnalysisResult {
 
 export const ATSAnalyzerPage = () => {
     const { user } = useAuth();
+    const location = useLocation();
+    
+    // Initialize with state from Job Board if available
     const [file, setFile] = useState<File | null>(null);
-    const [jobDescription, setJobDescription] = useState('');
+    const [jobDescription, setJobDescription] = useState(location.state?.jobDescription || '');
     const [analyzing, setAnalyzing] = useState(false);
     const [step, setStep] = useState(1); // 1: Upload, 2: Job Target, 3: Results
     const [result, setResult] = useState<ATSAnalysisResult | null>(null);
+
+    useEffect(() => {
+        if (location.state?.jobDescription) {
+            toast.info("Job description loaded from Job Board. Please upload your resume to analyze.");
+        }
+    }, [location.state]);
 
     const onDrop = (acceptedFiles: File[]) => {
         if (acceptedFiles.length > 0) {
@@ -111,7 +121,7 @@ export const ATSAnalyzerPage = () => {
                                     onClick={(e) => { e.stopPropagation(); setStep(2); }}
                                     className="bg-black text-white px-8 py-3 rounded-full font-medium hover:bg-gray-800 transition-all shadow-lg"
                                 >
-                                    Continue to Job Targeting
+                                    {jobDescription ? "Continue with Loaded Job Description" : "Continue to Job Targeting"}
                                 </button>
                             </div>
                         )}

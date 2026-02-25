@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
-import { toast } from 'sonner';
+import { useNotifications } from '@/contexts/NotificationContext';
+import { useAuth } from '@/features/auth/AuthContext';
+import { supportService } from './services/supportService';
 
 const FAQS = [
     {
@@ -22,17 +24,51 @@ const FAQS = [
 ];
 
 export const HelpCenterPage = () => {
+    const { user } = useAuth();
+    const { addNotification } = useNotifications();
     const [openIndex, setOpenIndex] = useState<number | null>(null);
     const [isContactOpen, setIsContactOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formData, setFormData] = useState({
+        subject: 'General Inquiry',
+        message: ''
+    });
 
     const toggleFaq = (index: number) => {
         setOpenIndex(openIndex === index ? null : index);
     };
 
-    const handleContactSubmit = (e: React.FormEvent) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleContactSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsContactOpen(false);
-        toast.success("Support ticket created successfully. We'll be in touch!");
+        
+        if (!user) {
+            addNotification('Error', 'You must be logged in to submit a support ticket.', 'error');
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            await supportService.createTicket({
+                userId: user.uid,
+                userEmail: user.email || 'unknown',
+                subject: formData.subject,
+                message: formData.message,
+            });
+
+            addNotification('Support Ticket Created', 'We received your message and will be in touch shortly.', 'success');
+            setIsContactOpen(false);
+            setFormData({ subject: 'General Inquiry', message: '' });
+        } catch (error) {
+            console.error('Failed to create ticket:', error);
+            addNotification('Error', 'Failed to submit support ticket. Please try again.', 'error');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -50,16 +86,24 @@ export const HelpCenterPage = () => {
                         <form onSubmit={handleContactSubmit} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                                <select className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none">
-                                    <option>General Inquiry</option>
-                                    <option>Technical Issue</option>
-                                    <option>Billing Question</option>
-                                    <option>Feature Request</option>
+                                <select 
+                                    name="subject"
+                                    value={formData.subject}
+                                    onChange={handleInputChange}
+                                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none"
+                                >
+                                    <option value="General Inquiry">General Inquiry</option>
+                                    <option value="Technical Issue">Technical Issue</option>
+                                    <option value="Billing Question">Billing Question</option>
+                                    <option value="Feature Request">Feature Request</option>
                                 </select>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
                                 <textarea 
+                                    name="message"
+                                    value={formData.message}
+                                    onChange={handleInputChange}
                                     rows={4} 
                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none"
                                     placeholder="Describe your issue..."
@@ -71,14 +115,17 @@ export const HelpCenterPage = () => {
                                     type="button"
                                     onClick={() => setIsContactOpen(false)}
                                     className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
+                                    disabled={isSubmitting}
                                 >
                                     Cancel
                                 </button>
                                 <button 
                                     type="submit"
-                                    className="px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800"
+                                    className="px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    disabled={isSubmitting}
                                 >
-                                    Send Message
+                                    {isSubmitting && <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>}
+                                    {isSubmitting ? 'Sending...' : 'Send Message'}
                                 </button>
                             </div>
                         </form>

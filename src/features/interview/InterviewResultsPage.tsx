@@ -7,13 +7,32 @@ interface Message {
   content: string;
 }
 
+interface InterviewFeedback {
+  score: number;
+  summary: string;
+  strengths: string[];
+  improvements: string[];
+}
+
 export const InterviewResultsPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const messages = (location.state as { messages?: Message[] })?.messages || [];
+  const feedback = (location.state as { feedback?: InterviewFeedback })?.feedback;
 
   // Filter out user answers for display in mock analysis
   const userAnswers = messages.filter(m => m.role === 'user');
+  
+  // Pair messages for transcript view (Question -> Answer)
+  const conversationPairs: { question: string; answer: string }[] = [];
+  for (let i = 0; i < messages.length - 1; i++) {
+      if (messages[i].role === 'ai' && messages[i+1].role === 'user') {
+          conversationPairs.push({
+              question: messages[i].content,
+              answer: messages[i+1].content
+          });
+      }
+  }
 
   return (
     <DashboardLayout>
@@ -40,7 +59,7 @@ export const InterviewResultsPage = () => {
         </div>
 
         {/* Top Level Scores - Empty State */}
-        {userAnswers.length === 0 ? (
+        {(!feedback && userAnswers.length === 0) ? (
              <div className="bg-white rounded-3xl shadow-sm p-12 text-center border border-gray-100 flex flex-col items-center justify-center min-h-[400px]">
                 <div className="w-20 h-20 bg-indigo-50 text-indigo-200 rounded-full flex items-center justify-center mb-6">
                     <span className="material-symbols-outlined text-4xl">analytics</span>
@@ -64,15 +83,15 @@ export const InterviewResultsPage = () => {
                 <div className="relative w-32 h-32 mb-4">
                      <svg className="w-full h-full transform -rotate-90">
                         <circle className="text-gray-100" cx="64" cy="64" fill="transparent" r="56" stroke="currentColor" strokeWidth="12"></circle>
-                        <circle className="text-green-500" cx="64" cy="64" fill="transparent" r="56" stroke="currentColor" strokeDasharray="351.86" strokeDashoffset="35" strokeLinecap="round" strokeWidth="12"></circle>
+                        <circle className="text-green-500" cx="64" cy="64" fill="transparent" r="56" stroke="currentColor" strokeDasharray="351.86" strokeDashoffset={351.86 - (351.86 * (feedback?.score || 0)) / 100} strokeLinecap="round" strokeWidth="12"></circle>
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-3xl font-bold text-gray-900">92%</span>
+                        <span className="text-3xl font-bold text-gray-900">{feedback?.score || 0}%</span>
                         <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Overall</span>
                     </div>
                 </div>
-                <h3 className="font-bold text-gray-900">Great Performance!</h3>
-                <p className="text-sm text-gray-500 mt-1">You showed strong technical knowledge.</p>
+                <h3 className="font-bold text-gray-900">{feedback && feedback.score >= 80 ? 'Great Performance!' : feedback && feedback.score >= 60 ? 'Good Effort' : 'Needs Improvement'}</h3>
+                <p className="text-sm text-gray-500 mt-1 line-clamp-3">{feedback?.summary || "No summary available."}</p>
             </div>
 
             <div className="bg-white p-6 rounded-3xl shadow-soft md:col-span-2 grid grid-cols-2 gap-6">
@@ -115,18 +134,23 @@ export const InterviewResultsPage = () => {
                         Key Feedback
                     </h4>
                     <ul className="space-y-3 text-sm text-gray-600">
-                        <li className="flex gap-2 items-start">
-                            <span className="material-symbols-outlined text-green-500 text-base mt-0.5">check_circle</span>
-                            Good use of STAR method in the behavioral question.
-                        </li>
-                        <li className="flex gap-2 items-start">
-                             <span className="material-symbols-outlined text-orange-400 text-base mt-0.5">warning</span>
-                            Try to be more specific about the outcomes in your first answer.
-                        </li>
-                        <li className="flex gap-2 items-start">
-                             <span className="material-symbols-outlined text-blue-500 text-base mt-0.5">info</span>
-                            Your speaking pace was slightly fast in the beginning.
-                        </li>
+                        {feedback?.strengths?.slice(0, 3).map((strength, i) => (
+                            <li key={`str-${i}`} className="flex gap-2 items-start">
+                                <span className="material-symbols-outlined text-green-500 text-base mt-0.5 min-w-[16px]">check_circle</span>
+                                <span>{strength}</span>
+                            </li>
+                        ))}
+                        {feedback?.improvements?.slice(0, 3).map((weakness, i) => (
+                            <li key={`weak-${i}`} className="flex gap-2 items-start">
+                                <span className="material-symbols-outlined text-orange-400 text-base mt-0.5 min-w-[16px]">warning</span>
+                                <span>{weakness}</span>
+                            </li>
+                        ))}
+                        {(!feedback?.strengths?.length && !feedback?.improvements?.length) && (
+                             <li className="flex gap-2 items-start text-gray-400 italic">
+                                No specific feedback points available.
+                             </li>
+                        )}
                     </ul>
                 </div>
             </div>
@@ -134,70 +158,27 @@ export const InterviewResultsPage = () => {
         )}
 
         {/* Detailed Transcript Analysis */}
-        {userAnswers.length > 0 && (
+        {conversationPairs.length > 0 && (
         <div className="bg-white rounded-3xl shadow-soft overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-                <h3 className="font-bold text-gray-900">Transcript Analysis</h3>
-                <button className="text-sm text-indigo-600 font-medium hover:text-indigo-700">Download Report</button>
+                <h3 className="font-bold text-gray-900">Transcript History</h3>
+                {/* <button className="text-sm text-indigo-600 font-medium hover:text-indigo-700">Download Report</button> */}
             </div>
             <div className="p-6 space-y-6">
-                {/* Q1 Analysis */}
-                <div className="border border-gray-100 rounded-2xl p-6 hover:shadow-md transition">
-                    <div className="flex items-start gap-4 mb-4">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold flex-shrink-0">Q1</div>
-                        <div>
-                            <p className="font-medium text-gray-900">Tell me about yourself.</p>
-                            <p className="text-sm text-gray-500 mt-1">Difficulty: Introductory</p>
+                {conversationPairs.map((pair, index) => (
+                    <div key={index} className="border border-gray-100 rounded-2xl p-6 hover:shadow-md transition">
+                        <div className="flex items-start gap-4 mb-4">
+                            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold flex-shrink-0">Q{index + 1}</div>
+                            <div className="flex-1">
+                                <p className="font-medium text-gray-900">{pair.question}</p>
+                            </div>
                         </div>
-                        <span className="ml-auto px-3 py-1 bg-green-50 text-green-700 text-xs font-bold rounded-full border border-green-100">Strong Answer</span>
-                    </div>
-                    
-                    <div className="bg-gray-50 rounded-xl p-4 mb-4">
-                        <p className="text-sm text-gray-600 italic">
-                             {userAnswers.length > 0 ? `"${userAnswers[0].content}"` : `"I have been a software engineer for 5 years, primarily working with React and Node.js..."`}
-                        </p>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-4 text-sm">
-                        <div className="flex-1">
-                            <h5 className="font-bold text-gray-800 mb-1 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-green-500 text-sm">thumb_up</span> Positives
-                            </h5>
-                            <p className="text-gray-500">Concise summary of relevant experience. Good mention of current tech stack.</p>
-                        </div>
-                        <div className="flex-1">
-                            <h5 className="font-bold text-gray-800 mb-1 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-orange-500 text-sm">trending_up</span> Improvements
-                            </h5>
-                            <p className="text-gray-500">Could have connected the introduction more directly to this specific role's requirements.</p>
+                        
+                        <div className="bg-gray-50 rounded-xl p-4 ml-12">
+                            <p className="text-sm text-gray-600 italic whitespace-pre-wrap">"{pair.answer}"</p>
                         </div>
                     </div>
-                </div>
-
-                 {/* Q2 Analysis */}
-                 <div className="border border-gray-100 rounded-2xl p-6 hover:shadow-md transition">
-                    <div className="flex items-start gap-4 mb-4">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold flex-shrink-0">Q2</div>
-                        <div>
-                            <p className="font-medium text-gray-900">Can you describe a challenging technical problem you've solved?</p>
-                            <p className="text-sm text-gray-500 mt-1">Difficulty: Hard</p>
-                        </div>
-                        <span className="ml-auto px-3 py-1 bg-yellow-50 text-yellow-700 text-xs font-bold rounded-full border border-yellow-100">Average Answer</span>
-                    </div>
-                    
-                    <div className="bg-gray-50 rounded-xl p-4 mb-4">
-                        <p className="text-sm text-gray-600 italic">"[User Answer Transcript Placeholder]..."</p>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-4 text-sm">
-                        <div className="flex-1">
-                             <h5 className="font-bold text-gray-800 mb-1 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-purple-500 text-sm">psychology</span> AI Insight
-                            </h5>
-                            <p className="text-gray-500">The technical depth was good, but the explanation of the "Why" behind the solution was lacking detail.</p>
-                        </div>
-                    </div>
-                </div>
+                ))}
             </div>
         </div>
         )}

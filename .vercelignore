@@ -1,0 +1,27 @@
+# Vercel
+.vercel
+.env
+.env.local
+.env.*.local
+node_modules
+dist
+.git
+.gitignore
+
+# Tests
+coverage
+cypress
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Documentation
+README.md
+docs/
+
+# Editor
+.vscode
+.idea
+*.swp
+*.swo

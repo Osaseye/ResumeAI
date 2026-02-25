@@ -1,29 +1,66 @@
 import { DashboardLayout } from '@/layouts/DashboardLayout';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { jobsService } from '@/features/jobs/services/jobService';
+import type { Job } from '@/features/jobs/services/jobService';
+import { toast } from 'sonner';
 
 export const JobMatchesPage = () => {
   const navigate = useNavigate();
   const [view, setView] = useState<'matches' | 'saved'>('matches');
   const [showPreferences, setShowPreferences] = useState(false);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savedJobs, setSavedJobs] = useState<Job[]>(() => {
+      const saved = localStorage.getItem('saved_jobs_data');
+      return saved ? JSON.parse(saved) : [];
+  });
 
-  // No mock data - waiting for backend
-  interface Job {
-    id: number;
-    role: string;
-    company: string;
-    logo: string;
-    logoBg: string;
-    location: string;
-    salary: string;
-    matchScore: number;
-    tags: string[];
-    posted: string;
-    isSaved: boolean;
-  }
-  const jobs: Job[] = [];
+  useEffect(() => {
+    const fetchJobs = async () => {
+        setLoading(true);
+        try {
+            const data = await jobsService.searchJobs('Software Engineer', 'Nigeria');
+            setJobs(data);
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to load jobs");
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchJobs();
+  }, []);
   
-  const displayedJobs = view === 'saved' ? jobs.filter(j => j.isSaved) : jobs;
+  const handleSaveJob = (job: Job) => {
+      setSavedJobs(prev => {
+          const isAlreadySaved = prev.some(j => j.job_id === job.job_id);
+          let newSaved;
+          
+          if (isAlreadySaved) {
+              newSaved = prev.filter(j => j.job_id !== job.job_id);
+              toast.info("Job removed from saved list");
+          } else {
+              newSaved = [...prev, job];
+              toast.success("Job saved to your list");
+          }
+          
+          localStorage.setItem('saved_jobs_data', JSON.stringify(newSaved));
+          return newSaved;
+      });
+  };
+
+  const displayedJobs = view === 'saved' ? savedJobs : jobs;
+
+  const isJobSaved = (jobId: string) => savedJobs.some(j => j.job_id === jobId);
+
+  const handleAnalyze = (job: Job) => {
+      navigate('/ats-analyzer', { 
+        state: { 
+            jobDescription: job.job_description 
+        } 
+      });
+  };
 
   return (
     <DashboardLayout>
@@ -109,7 +146,12 @@ export const JobMatchesPage = () => {
       )}
 
       <div className="space-y-4">
-        {displayedJobs.length === 0 ? (
+        {loading ? (
+             <div className="flex flex-col items-center justify-center py-20">
+                <div className="w-10 h-10 border-4 border-gray-200 border-t-black rounded-full animate-spin mb-4"></div>
+                <p className="text-gray-500">Searching specifically for you based on profile...</p>
+             </div>
+        ) : displayedJobs.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 shadow-sm">
                 <span className="material-symbols-outlined text-4xl text-gray-300 mb-4">work_off</span>
                 <h3 className="text-lg font-medium text-gray-900">No jobs found</h3>
@@ -122,36 +164,44 @@ export const JobMatchesPage = () => {
         ) : (
             displayedJobs.map((job) => (
           <div 
-             key={job.id}  
-             onClick={() => navigate(`/jobs/${job.id}`)}
+             key={job.job_id}  
+             onClick={() => navigate(`/jobs/${job.job_id}`, { state: { job } })} 
              className="bg-white p-6 rounded-2xl shadow-soft hover:shadow-card transition-all border border-gray-100 flex flex-col md:flex-row gap-6 cursor-pointer group"
            >
             <div className="flex-shrink-0">
-               <div className={`w-16 h-16 ${job.logoBg} text-white rounded-xl flex items-center justify-center text-2xl font-bold shadow-sm`}>
-                 {job.logo}
+               <div className={`w-16 h-16 bg-white border border-gray-100 rounded-xl flex items-center justify-center p-2 shadow-sm`}>
+                 {job.employer_logo ? (
+                    <img src={job.employer_logo} alt={job.employer_name} className="w-full h-full object-contain" />
+                 ) : (
+                    <span className="text-xl font-bold text-gray-400">{job.employer_name.substring(0, 2).toUpperCase()}</span>
+                 )}
                </div>
             </div>
             
             <div className="flex-1">
               <div className="flex flex-col md:flex-row md:items-start justify-between mb-2">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{job.role}</h3>
-                  <p className="text-gray-600 font-medium">{job.company} • {job.location}</p>
+                  <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{job.job_title}</h3>
+                  <p className="text-gray-600 font-medium">{job.employer_name} • {job.job_city}, {job.job_country} {job.job_is_remote && '(Remote)'}</p>
                 </div>
                 <div className="mt-2 md:mt-0 flex flex-col items-start md:items-end">
-                  <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm font-bold border border-green-100 mb-1">
-                    <span className="material-symbols-outlined text-base">verified</span>
-                    {job.matchScore}% Update
-                  </div>
-                  <span className="text-xs text-gray-400">{job.posted}</span>
+                  {job.match_score && (
+                    <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm font-bold border border-green-100 mb-1">
+                        <span className="material-symbols-outlined text-base">verified</span>
+                        {job.match_score}% Match
+                    </div>
+                  )}
+                  <span className="text-xs text-gray-400">Posted {Math.floor((Date.now() - job.job_posted_at_timestamp) / (1000 * 60 * 60 * 24))} days ago</span>
                 </div>
               </div>
               
               <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                 <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[18px]">payments</span>
-                    {job.salary}
-                 </span>
+                 {job.job_min_salary && (
+                     <span className="flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[18px]">payments</span>
+                        {job.job_salary_currency} {job.job_min_salary.toLocaleString()} - {job.job_max_salary?.toLocaleString()}
+                     </span>
+                 )}
                  <span className="flex items-center gap-1">
                     <span className="material-symbols-outlined text-[18px]">schedule</span>
                     Full-time
@@ -159,7 +209,8 @@ export const JobMatchesPage = () => {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {job.tags.map(tag => (
+                {/* Mock tags for now */}
+                {["Full-time", "Engineering", "Tech"].map(tag => (
                    <span key={tag} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-md text-xs font-medium">
                      {tag}
                    </span>
@@ -169,26 +220,30 @@ export const JobMatchesPage = () => {
 
             <div className="flex flex-col gap-2 justify-center border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-6 min-w-[180px]">
                 <button 
-                    onClick={(e) => { e.stopPropagation(); /* Apply Logic */ }}
-                    className="bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 transition shadow-lg shadow-gray-200"
+                     onClick={(e) => { e.stopPropagation(); handleAnalyze(job); }}
+                     className="bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 transition shadow-lg shadow-gray-200 flex items-center justify-center gap-2"
                 >
-                    Apply Now
+                    <span className="material-symbols-outlined text-[18px]">analytics</span>
+                    Analyze for Fit
                 </button>
            
                 <button 
-                     onClick={(e) => { e.stopPropagation(); /* Navigate to mock interview with job context */ navigate('/mock-interview') }}
-                     className="bg-purple-50 text-purple-700 border border-purple-100 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-100 transition flex items-center justify-center gap-2"
+                     onClick={(e) => { 
+                         e.stopPropagation(); 
+                         if (job.job_apply_link) window.open(job.job_apply_link, '_blank');
+                     }}
+                     className="bg-blue-50 text-blue-700 border border-blue-100 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-100 transition flex items-center justify-center gap-2"
                 >
-                    <span className="material-symbols-outlined text-[18px]">videocam</span>
-                    Mock Interview
+                    <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                    Apply Now
                 </button>
 
                  <button 
-                    onClick={(e) => { e.stopPropagation(); /* Save Logic */ }}
-                    className={`border px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 ${job.isSaved ? 'bg-gray-100 text-gray-900 border-gray-300' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                    onClick={(e) => { e.stopPropagation(); handleSaveJob(job); }}
+                    className={`border px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 ${isJobSaved(job.job_id) ? 'bg-gray-100 text-gray-900 border-gray-300' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                 >
-                     <span className={`material-symbols-outlined text-[18px] ${job.isSaved ? 'filled' : ''}`}>bookmark</span>
-                    {job.isSaved ? 'Saved' : 'Save Job'}
+                     <span className={`material-symbols-outlined text-[18px] ${isJobSaved(job.job_id) ? 'filled' : ''}`}>bookmark</span>
+                    {isJobSaved(job.job_id) ? 'Saved' : 'Save Job'}
                 </button>
             </div>
 
@@ -209,4 +264,5 @@ export const JobMatchesPage = () => {
     </DashboardLayout>
   );
 };
+
 

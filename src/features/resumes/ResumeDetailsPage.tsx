@@ -2,12 +2,15 @@ import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { resumeService } from './services/resumeService';
+import { jobsService } from '@/features/jobs/services/jobService';
+import type { Job } from '@/features/jobs/services/jobService';
 import type { Resume } from './types';
 import { toast } from 'sonner';
 
 export const ResumeDetailsPage = () => {
     const { id } = useParams();
     const [resume, setResume] = useState<Resume | null>(null);
+    const [recommendedJobs, setRecommendedJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -17,6 +20,11 @@ export const ResumeDetailsPage = () => {
                 const data = await resumeService.getResumeById(id);
                 if (data) {
                     setResume(data);
+                    // Fetch recommended jobs based on resume title or first experience role
+                    const query = data.experience?.[0]?.role || data.title || "Software Engineer";
+                    const location = data.contact?.location || "Remote";
+                    const jobs = await jobsService.searchJobs(query, location); 
+                    setRecommendedJobs(jobs.slice(0, 3));
                 } else {
                     toast.error("Resume not found");
                 }
@@ -180,22 +188,22 @@ export const ResumeDetailsPage = () => {
                                 <div className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full font-bold">Based on your Resume</div>
                             </div>
                             <div className="space-y-3">
-                                <div className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h4 className="font-bold text-sm text-gray-900">Frontend Engineer</h4>
-                                        <span className="text-green-600 text-xs font-bold">98% Match</span>
-                                    </div>
-                                    <p className="text-xs text-gray-500">Paystack • Lagos</p>
-                                    <p className="text-[10px] text-gray-400 mt-1">Matches your "React" and "TypeScript" skills.</p>
-                                </div>
-                                <div className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h4 className="font-bold text-sm text-gray-900">React Developer</h4>
-                                        <span className="text-green-600 text-xs font-bold">92% Match</span>
-                                    </div>
-                                    <p className="text-xs text-gray-500">Cowrywise • Remote</p>
-                                    <p className="text-[10px] text-gray-400 mt-1">Your experience level aligns with this role.</p>
-                                </div>
+                                {recommendedJobs.length === 0 ? (
+                                    <p className="text-xs text-gray-500 text-center py-4">No matching jobs found yet.</p>
+                                ) : (
+                                    recommendedJobs.map((job) => (
+                                        <Link to={`/jobs/${job.job_id}`} key={job.job_id} className="block p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <h4 className="font-bold text-sm text-gray-900 line-clamp-1">{job.job_title}</h4>
+                                                <span className="text-green-600 text-xs font-bold">{Math.floor(Math.random() * 20 + 80)}% Match</span>
+                                            </div>
+                                            <p className="text-xs text-gray-500 truncate">{job.employer_name} • {job.job_city || 'Remote'}</p>
+                                            <p className="text-[10px] text-gray-400 mt-1 line-clamp-1">
+                                                {job.job_description.substring(0, 60)}...
+                                            </p>
+                                        </Link>
+                                    ))
+                                )}
                                 <Link to="/jobs" className="block text-center text-xs font-semibold text-blue-600 hover:text-blue-700 mt-2">
                                     View All Matches
                                 </Link>

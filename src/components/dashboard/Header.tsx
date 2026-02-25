@@ -3,6 +3,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useNotifications } from '@/contexts/NotificationContext';
+import { formatDistanceToNow } from 'date-fns';
 
 interface UserProfile {
   displayName: string;
@@ -11,7 +13,14 @@ interface UserProfile {
 export const Header = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotifications } = useNotifications();
+  
+  // Initialize from cache to prevent flickering
+  const [profile, setProfile] = useState<UserProfile | null>(() => {
+      const cached = localStorage.getItem('user_profile_cache');
+      return cached ? JSON.parse(cached) : null;
+  });
+  
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
 
@@ -19,10 +28,22 @@ export const Header = () => {
     const fetchProfile = async () => {
         if (user?.uid) {
             try {
+                // First check if we have data from DashboardPage's cache which might be fresher
+                const dashboardCache = localStorage.getItem('dashboard_profile_cache');
+                if (dashboardCache) {
+                    const parsed = JSON.parse(dashboardCache);
+                    if (parsed.displayName) {
+                        setProfile(prev => ({ ...prev, ...parsed }));
+                    }
+                }
+
                 const docRef = doc(db, 'users', user.uid);
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
-                    setProfile(docSnap.data() as UserProfile);
+                    const data = docSnap.data() as UserProfile;
+                    setProfile(data);
+                    // Cache it
+                    localStorage.setItem('user_profile_cache', JSON.stringify(data));
                 }
             } catch (error) {
                 console.error("Error fetching profile:", error);
@@ -79,31 +100,81 @@ export const Header = () => {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 hidden md:flex">
+      <div className="hidden md:flex items-center gap-4">
         {/* Notification Dropdown */}
         <div className="relative" ref={notificationRef}>
             <button 
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-gray-500 hover:text-gray-700 shadow-sm transition"
+                className="relative w-10 h-10 rounded-full bg-white flex items-center justify-center text-gray-500 hover:text-gray-700 shadow-sm transition"
             >
             <span className="material-symbols-outlined text-[20px] relative text-gray-600">
                 notifications
             </span>
+            {unreadCount > 0 && (
+                <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 border border-white"></span>
+            )}
             </button>
 
             {showNotifications && (
                 <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="p-4 border-b border-gray-50 flex justify-between items-center">
                         <h3 className="font-bold text-gray-900">Notifications</h3>
-                        <button className="text-xs text-indigo-600 font-medium hover:underline">Mark all read</button>
+                        {unreadCount > 0 && (
+                            <button 
+                                onClick={() => markAllAsRead()}
+                                className="text-xs text-indigo-600 font-medium hover:underline"
+                            >
+                                Mark all read
+                            </button>
+                        )}
+                        {notifications.length > 0 && unreadCount === 0 && (
+                             <button 
+                                onClick={() => clearNotifications()}
+                                className="text-xs text-gray-400 font-medium hover:text-red-500"
+                            >
+                                Clear all
+                            </button>
+                        )}
                     </div>
                     <div className="max-h-80 overflow-y-auto">
-                        <div className="p-8 text-center text-gray-500 text-sm">
-                            No new notifications
-                        </div>
+                        {notifications.length > 0 ? (
+                            notifications.map((notification) => (
+                                <div 
+                                    key={notification.id} 
+                                    onClick={() => {
+                                        markAsRead(notification.id);
+                                        if (notification.link) navigate(notification.link);
+                                    }}
+                                    className={`p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition ${!notification.read ? 'bg-blue-50/50' : ''}`}
+                                >
+                                    <div className="flex gap-3">
+                                        <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${
+                                            notification.type === 'success' ? 'bg-green-500' :
+                                            notification.type === 'error' ? 'bg-red-500' :
+                                            notification.type === 'warning' ? 'bg-yellow-500' :
+                                            'bg-blue-500'
+                                        }`}></div>
+                                        <div className="flex-1">
+                                            <p className={`text-sm ${!notification.read ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>{notification.title}</p>
+                                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{notification.message}</p>
+                                            <p className="text-[10px] text-gray-400 mt-2">
+                                                {formatDistanceToNow(new Date(notification.timestamp), { addSuffix: true })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="p-8 text-center text-gray-500 text-sm">
+                                No new notifications
+                            </div>
+                        )}
                     </div>
                     <div className="p-2 border-t border-gray-50 bg-gray-50 text-center">
-                        <button onClick={() => navigate('/settings')} className="text-xs font-medium text-gray-600 hover:text-gray-900">View Settings</button>
+                        <button onClick={() => { 
+                            setShowNotifications(false);
+                            navigate('/settings/notifications'); 
+                        }} className="text-xs font-medium text-gray-600 hover:text-gray-900">View Settings</button>
                     </div>
                 </div>
             )}

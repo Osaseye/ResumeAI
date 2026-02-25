@@ -34,6 +34,7 @@ import { ResumeDetailsPage } from '@/features/resumes/ResumeDetailsPage';
 import { CoverLetterDetailsPage } from '@/features/cover-letter/CoverLetterDetailsPage';
 
 import { OnboardingPage } from '@/features/auth/OnboardingPage';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 
 const LandingPage = () => (
   <>
@@ -51,7 +52,9 @@ function App() {
   return (
     <Router>
       <ToastProvider />
-      <div className="min-h-screen bg-background-light font-sans text-text-light selection:bg-gray-900 selection:text-white overflow-x-hidden">
+      <NotificationProvider>
+        <div className="min-h-screen bg-background-light font-sans text-text-light selection:bg-gray-900 selection:text-white overflow-x-hidden">
+
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -77,7 +80,8 @@ function App() {
           <Route path="/settings/billing" element={<BillingPage />} />
           <Route path="/help" element={<HelpCenterPage />} />
         </Routes>
-      </div>
+        </div>
+      </NotificationProvider>
     </Router>
   )
 }
