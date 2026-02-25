@@ -101,7 +101,7 @@ export const ResumeBuilderPage = () => {
                 toast.warning("AI enhancement unavailable. Saving original content.");
             }
 
-            const docId = await resumeService.createResume(user.uid, finalData);
+            await resumeService.createResume(user.uid, finalData);
             toast.success("Resume created successfully!");
             
             // Navigate to the new resume details (when available)

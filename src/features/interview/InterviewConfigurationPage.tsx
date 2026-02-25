@@ -3,13 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { useAuth } from '@/features/auth/AuthContext';
 import { resumeService } from '@/features/resumes/services/resumeService';
-import { jobsService } from '@/features/jobs/services/jobService';
+import { type Job } from '@/features/jobs/services/jobService';
 import type { Resume } from '@/features/resumes/types';
-import type { Job } from '@/features/jobs/types';
-
-// Simple in-memory cache to persist data during client-side navigation
-// Clears on page reload, which matches user requirement
-let cachedJobsData: Job[] | null = null; 
 
 export const InterviewConfigurationPage = () => {
     const navigate = useNavigate();
@@ -67,7 +62,7 @@ export const InterviewConfigurationPage = () => {
         const skills = resume.skills?.map(s => s.name).join(', ') || '';
 
         return `
-        Name: ${resume.personalInfo?.fullName || 'Candidate'}
+        Name: ${resume.contact?.fullName || 'Candidate'}
         Summary: ${resume.summary || ''}
         
         Experience:

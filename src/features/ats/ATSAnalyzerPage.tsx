@@ -5,7 +5,6 @@ import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { fileParser } from '@/services/fileParser';
 import { vertexService } from '@/features/ai/services/vertexService';
-import { useAuth } from '@/features/auth/AuthContext';
 
 interface ATSAnalysisResult {
     score: number;
@@ -17,7 +16,6 @@ interface ATSAnalysisResult {
 }
 
 export const ATSAnalyzerPage = () => {
-    const { user } = useAuth();
     const location = useLocation();
     
     // Initialize with state from Job Board if available

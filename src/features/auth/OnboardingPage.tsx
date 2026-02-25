@@ -58,7 +58,7 @@ export const OnboardingPage = () => {
   });
 
   const selectedGoals = watch('goals');
-  const selectedLevel = watch('experienceLevel');
+  const selectedLevel = watch('experience');
 
   const toggleGoal = (goal: string) => {
     const current = selectedGoals || [];
@@ -83,7 +83,7 @@ export const OnboardingPage = () => {
         email: user.email,
         displayName: data.fullName,
         role: data.role,
-        experienceLevel: data.experienceLevel,
+        experienceLevel: data.experience,
         goals: data.goals,
         createdAt: new Date().toISOString(),
         onboardingComplete: true
@@ -164,7 +164,7 @@ export const OnboardingPage = () => {
                     {EXPERIENCE_LEVELS.map((level) => (
                         <div 
                             key={level.id}
-                            onClick={() => setValue('experienceLevel', level.id as any)}
+                            onClick={() => setValue('experience', level.id as any)}
                             className={`flex items-center p-4 border rounded-xl cursor-pointer transition-all ${
                                 selectedLevel === level.id 
                                     ? 'border-black bg-gray-50 ring-1 ring-black' 
@@ -179,7 +179,7 @@ export const OnboardingPage = () => {
                             <span className="font-medium text-gray-900">{level.label}</span>
                         </div>
                     ))}
-                    {errors.experienceLevel && <p className="mt-1 text-sm text-red-600">{errors.experienceLevel.message}</p>}
+                    {errors.experience && <p className="mt-1 text-sm text-red-600">{errors.experience.message}</p>}
                 </div>
 
                 <div className="flex gap-3">

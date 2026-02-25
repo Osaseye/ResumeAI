@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom';
-import { jobsService } from '@/features/jobs/services/jobService';
 import { useEffect, useState } from 'react';
 
 export const Sidebar = () => {
