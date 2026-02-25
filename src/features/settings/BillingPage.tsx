@@ -11,27 +11,17 @@ const PLAN_FEATURES = [
   "Priority Support"
 ];
 
-const BILLING_HISTORY = [
-    { id: 'inv_001', date: 'Feb 01, 2026', amount: '₦ 5,000.00', status: 'Paid', plan: 'Pro Monthly' },
-    { id: 'inv_002', date: 'Jan 01, 2026', amount: '₦ 5,000.00', status: 'Paid', plan: 'Pro Monthly' },
-    { id: 'inv_003', date: 'Dec 01, 2025', amount: '₦ 5,000.00', status: 'Paid', plan: 'Pro Monthly' },
+const BILLING_HISTORY: Array<{id: string, date: string, amount: string, status: string, plan: string}> = [
+    // { id: 'inv_001', date: 'Feb 01, 2026', amount: '₦ 5,000.00', status: 'Paid', plan: 'Pro Monthly' },
 ];
 
 export const BillingPage = () => {
-  const [currentPlan, setCurrentPlan] = useState('pro');
-  // Use currentPlan to silence TS unused error
+  const [currentPlan] = useState('free');
   console.log("Current Plan:", currentPlan);
 
   const handleUpgrade = () => {
     toast.success('Redirecting to payment gateway...');
     // Stripe/Paddle integration would typically go here
-  };
-
-  const handleCancel = () => {
-    if (window.confirm("Are you sure you want to cancel your subscription? You will lose access to premium features.")) {
-        toast.info("Subscription cancelled. Access remains until end of billing cycle.");
-        setCurrentPlan('free');
-    }
   };
 
   return (
@@ -48,14 +38,13 @@ export const BillingPage = () => {
                 </div>
                 <div className="relative z-10">
                     <div className="flex items-center justify-between mb-4">
-                        <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-white/10">Active Plan</span>
-                        <span className="text-indigo-200 text-sm">Renews Mar 01, 2026</span>
+                        <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-white/10">Current Plan</span>
                     </div>
-                    <h2 className="text-4xl font-bold mb-2">Pro Monthly</h2>
-                    <p className="text-indigo-200 mb-8 text-lg">₦ 5,000.00 / month</p>
+                    <h2 className="text-4xl font-bold mb-2">Free Plan</h2>
+                    <p className="text-indigo-200 mb-8 text-lg">₦ 0.00 / month</p>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-                        {PLAN_FEATURES.map((feature, idx) => (
+                        {PLAN_FEATURES.slice(0, 2).map((feature, idx) => (
                             <div key={idx} className="flex items-center gap-2 text-sm">
                                 <span className="material-symbols-outlined text-green-400 text-base">check_circle</span>
                                 {feature}
@@ -68,14 +57,8 @@ export const BillingPage = () => {
                             onClick={handleUpgrade}
                             className="bg-white text-indigo-900 px-6 py-3 rounded-xl font-bold hover:bg-indigo-50 transition shadow-lg"
                         >
-                            Change Plan
+                            Upgrade to Pro
                         </button> 
-                         <button 
-                            onClick={handleCancel}
-                            className="bg-transparent border border-white/30 text-white px-6 py-3 rounded-xl font-bold hover:bg-white/10 transition"
-                        >
-                            Cancel Subscription
-                        </button>
                     </div>
                 </div>
             </div>
@@ -84,18 +67,13 @@ export const BillingPage = () => {
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col justify-between">
                 <div>
                     <h3 className="font-bold text-gray-900 mb-6">Payment Method</h3>
-                    <div className="flex items-center gap-4 p-4 border border-gray-200 rounded-xl mb-4 bg-gray-50">
-                        <div className="w-10 h-6 bg-gray-200 rounded flex items-center justify-center text-xs font-bold text-gray-500">
-                            VISA
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold text-gray-900">•••• 4242</p>
-                            <p className="text-xs text-gray-500">Expires 12/28</p>
-                        </div>
+                    <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-200 rounded-xl mb-4 bg-gray-50 text-center">
+                        <span className="material-symbols-outlined text-gray-400 text-3xl mb-2">credit_card</span>
+                        <p className="text-sm text-gray-500">No payment method added</p>
                     </div>
                 </div>
                 <button className="w-full py-3 text-indigo-600 font-bold text-sm bg-indigo-50 hover:bg-indigo-100 rounded-xl transition">
-                    Update Card
+                    Add Payment Method
                 </button>
             </div>
         </div>

@@ -39,7 +39,26 @@ export const InterviewResultsPage = () => {
             </div>
         </div>
 
-        {/* Top Level Scores */}
+        {/* Top Level Scores - Empty State */}
+        {userAnswers.length === 0 ? (
+             <div className="bg-white rounded-3xl shadow-sm p-12 text-center border border-gray-100 flex flex-col items-center justify-center min-h-[400px]">
+                <div className="w-20 h-20 bg-indigo-50 text-indigo-200 rounded-full flex items-center justify-center mb-6">
+                    <span className="material-symbols-outlined text-4xl">analytics</span>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">No Analysis Available</h2>
+                <p className="text-gray-500 max-w-md mx-auto mb-8">
+                    Complete your first mock interview to see detailed AI feedback on your performance, clarity, and keyword usage.
+                </p>
+                <div className="flex gap-4">
+                     <button 
+                        onClick={() => navigate('/mock-interview/configure')}
+                        className="bg-black text-white px-8 py-3 rounded-full font-bold hover:bg-gray-800 transition shadow-lg"
+                    >
+                        Start First Session
+                    </button>
+                </div>
+            </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div className="bg-white p-6 rounded-3xl shadow-soft flex flex-col items-center text-center">
                 <div className="relative w-32 h-32 mb-4">
@@ -112,8 +131,10 @@ export const InterviewResultsPage = () => {
                 </div>
             </div>
         </div>
+        )}
 
         {/* Detailed Transcript Analysis */}
+        {userAnswers.length > 0 && (
         <div className="bg-white rounded-3xl shadow-soft overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
                 <h3 className="font-bold text-gray-900">Transcript Analysis</h3>
@@ -179,6 +200,7 @@ export const InterviewResultsPage = () => {
                 </div>
             </div>
         </div>
+        )}
       </div>
     </DashboardLayout>
   );

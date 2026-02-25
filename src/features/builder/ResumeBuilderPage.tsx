@@ -1,91 +1,119 @@
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
+import { useAuth } from '@/features/auth/AuthContext';
+import { resumeService } from '../resumes/services/resumeService';
+import { vertexService } from '@/features/ai/services/vertexService';
+import type { ResumeFormData, Experience, Education } from '../resumes/types';
 
 const steps = ['Personal Info', 'Experience', 'Education', 'Skills', 'Summary', 'Finalize'];
 
-interface Experience {
-    id: number;
-    title: string;
-    company: string;
-    startDate: string;
-    endDate: string;
-    description: string;
-}
-
-interface Education {
-    id: number;
-    degree: string;
-    school: string;
-    year: string;
-}
-
 export const ResumeBuilderPage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const { user } = useAuth();
     const [currentStep, setCurrentStep] = useState(0);
-    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isSaving, setIsSaving] = useState(false);
 
-    // State for all form fields
-    const [formData, setFormData] = useState({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        headline: '',
-        city: '',
-        country: '',
-        linkedin: '',
-        portfolio: '',
-        experience: [] as Experience[],
-        education: [] as Education[],
-        skills: '',
-        summary: ''
+    // Initial State matching ResumeFormData
+    const [formData, setFormData] = useState<ResumeFormData>(() => {
+        if (location.state?.parsedData) {
+            const data = location.state.parsedData;
+            return {
+                title: data.title || 'Imported Resume',
+                headline: data.headline || '',
+                contact: {
+                    fullName: data.contact?.fullName || '',
+                    email: data.contact?.email || '',
+                    phone: data.contact?.phone || '',
+                    location: data.contact?.location || '',
+                    linkedin: data.contact?.linkedin || '',
+                    website: data.contact?.website || ''
+                },
+                summary: data.summary || '',
+                experience: data.experience || [],
+                education: data.education || [],
+                skills: data.skills || [],
+                projects: data.projects || []
+            };
+        }
+        return {
+            title: 'Untitled Resume',
+            headline: '',
+            contact: {
+                fullName: '',
+                email: '',
+                phone: '',
+                location: '',
+                linkedin: '',
+                website: ''
+            },
+            summary: '',
+            experience: [],
+            education: [],
+            skills: [],
+            projects: []
+        };
     });
 
-    const handleChange = (field: string, value: any) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
-        // Clear error when user types
-        if (errors[field]) {
-            setErrors(prev => {
-                const newErrors = { ...prev };
-                delete newErrors[field];
-                return newErrors;
-            });
-        }
+    const updateContact = (field: keyof typeof formData.contact, value: string) => {
+        setFormData(prev => ({
+            ...prev,
+            contact: { ...prev.contact, [field]: value }
+        }));
     };
+
 
     // Validation Logic
     const validateStep = (stepIndex: number) => {
-        const newErrors: Record<string, string> = {};
         let isValid = true;
-
-        if (stepIndex === 0) { // Personal Info
-            if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
-            if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
-            if (!formData.headline.trim()) newErrors.headline = 'Professional headline is required';
-            if (!formData.email.trim()) {
-                newErrors.email = 'Email is required';
-            } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-                newErrors.email = 'Email is invalid';
-            }
-        }
         
-        if (stepIndex === 1) { // Experience
-            if (formData.experience.length === 0) {
-               // Optional: Require at least one job? Let's say yes for a "Professional" resume
-               // isValid = false;
-               // alert("Please add at least one work experience."); 
-               // For now, let's allow empty if they are a student, but if they started adding one, check fields?
-               // Simplified: No validation on the list itself, but validation inside the "Add" modal would happen there.
-            }
+        switch(stepIndex) {
+            case 0: // Personal Info
+                if (!formData.contact.fullName.trim() || !formData.contact.email.trim()) {
+                    toast.error("Full Name and Email are required");
+                    isValid = false;
+                }
+                break;
+            // Add other steps as needed
         }
-
-        if (Object.keys(newErrors).length > 0) {
-            setErrors(newErrors);
-            isValid = false;
-        }
-
         return isValid;
+    };
+
+    const handleSave = async () => {
+        if (!user) {
+            toast.error("You must be logged in to save.");
+            return;
+        }
+        setIsSaving(true);
+        try {
+            toast("AI is polishing your resume...");
+            
+            // Attempt Requirement: "Create the resume using the information filled"
+            let finalData = formData;
+            try {
+                const enhancedData = await vertexService.enhanceResume(formData);
+                // Merge enhanced data safely
+                finalData = { ...formData, ...enhancedData };
+            } catch (aiError) {
+                console.error("AI Generation failed, falling back to original:", aiError);
+                toast.warning("AI enhancement unavailable. Saving original content.");
+            }
+
+            const docId = await resumeService.createResume(user.uid, finalData);
+            toast.success("Resume created successfully!");
+            
+            // Navigate to the new resume details (when available)
+            // For now, let's keep it pointing to /my-resumes so the user doesn't hit a 404
+            navigate('/my-resumes');
+            
+        } catch (error: any) {
+            console.error(error);
+            toast.error("Failed to save resume: " + error.message);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleNext = () => {
@@ -108,19 +136,28 @@ export const ResumeBuilderPage = () => {
             ...prev,
             experience: [
                 ...prev.experience,
-                { id: Date.now(), title: '', company: '', startDate: '', endDate: '', description: '' }
+                { 
+                    id: Date.now().toString(), 
+                    role: '', 
+                    company: '', 
+                    startDate: '', 
+                    endDate: '', 
+                    current: false,
+                    location: '', 
+                    description: '' 
+                }
             ]
         }));
     };
 
-    const updateExperience = (id: number, field: keyof Experience, value: string) => {
+    const updateExperience = (id: string, field: keyof Experience, value: any) => {
         setFormData(prev => ({
             ...prev,
             experience: prev.experience.map(exp => exp.id === id ? { ...exp, [field]: value } : exp)
         }));
     };
     
-    const removeExperience = (id: number) => {
+    const removeExperience = (id: string) => {
         setFormData(prev => ({
             ...prev,
             experience: prev.experience.filter(exp => exp.id !== id)
@@ -133,22 +170,49 @@ export const ResumeBuilderPage = () => {
             ...prev,
             education: [
                 ...prev.education,
-                { id: Date.now(), degree: '', school: '', year: '' }
+                { 
+                    id: Date.now().toString(), 
+                    school: '', 
+                    degree: '', 
+                    field: '', 
+                    location: '', 
+                    startDate: '', 
+                    endDate: '', 
+                    current: false 
+                }
             ]
         }));
     };
 
-    const updateEducation = (id: number, field: keyof Education, value: string) => {
+    const updateEducation = (id: string, field: keyof Education, value: any) => {
         setFormData(prev => ({
             ...prev,
             education: prev.education.map(edu => edu.id === id ? { ...edu, [field]: value } : edu)
         }));
     };
 
-    const removeEducation = (id: number) => {
+    const removeEducation = (id: string) => {
         setFormData(prev => ({
             ...prev,
             education: prev.education.filter(edu => edu.id !== id)
+        }));
+    };
+
+    const addSkill = (skillName: string) => {
+        if (!skillName.trim()) return;
+        setFormData(prev => ({
+            ...prev,
+            skills: [
+                ...prev.skills,
+                { id: Date.now().toString(), name: skillName, level: 'Intermediate' }
+            ]
+        }));
+    };
+
+    const removeSkill = (id: string) => {
+        setFormData(prev => ({
+            ...prev,
+            skills: prev.skills.filter(skill => skill.id !== id)
         }));
     };
 
@@ -210,97 +274,88 @@ export const ResumeBuilderPage = () => {
                         {/* Step 0: Personal Info */}
                         {currentStep === 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <div className="col-span-1">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">First Name <span className="text-red-500">*</span></label>
+                             <div className="col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Resume Title <span className="text-red-500">*</span></label>
                                 <input 
                                     type="text" 
-                                    value={formData.firstName}
-                                    onChange={(e) => handleChange('firstName', e.target.value)}
-                                    className={`w-full px-4 py-2 border rounded-lg focus:ring-black focus:border-black ${errors.firstName ? 'border-red-500' : 'border-gray-300'}`} 
-                                    placeholder="John" 
+                                    value={formData.title}
+                                    onChange={(e) => setFormData(prev => ({...prev, title: e.target.value}))}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                                    placeholder="e.g. Senior Frontend Resume" 
                                 />
-                                {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
                             </div>
-                            <div className="col-span-1">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name <span className="text-red-500">*</span></label>
+                            
+                            <div className="col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
                                 <input 
                                     type="text" 
-                                    value={formData.lastName}
-                                    onChange={(e) => handleChange('lastName', e.target.value)}
-                                    className={`w-full px-4 py-2 border rounded-lg focus:ring-black focus:border-black ${errors.lastName ? 'border-red-500' : 'border-gray-300'}`}
-                                    placeholder="Doe" 
+                                    value={formData.contact.fullName}
+                                    onChange={(e) => updateContact('fullName', e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                                    placeholder="John Doe" 
                                 />
-                                {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
                             </div>
+                            
                             <div className="col-span-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
                                 <input 
                                     type="email" 
-                                    value={formData.email}
-                                    onChange={(e) => handleChange('email', e.target.value)}
-                                    className={`w-full px-4 py-2 border rounded-lg focus:ring-black focus:border-black ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
+                                    value={formData.contact.email}
+                                    onChange={(e) => updateContact('email', e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                                     placeholder="john@example.com" 
                                 />
-                                {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                             </div>
+                            
                             <div className="col-span-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                                 <input 
                                     type="tel" 
-                                    value={formData.phone}
-                                    onChange={(e) => handleChange('phone', e.target.value)}
+                                    value={formData.contact.phone}
+                                    onChange={(e) => updateContact('phone', e.target.value)}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" 
                                     placeholder="+1 (555) 000-0000" 
                                 />
                             </div>
-                            <div className="col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Professional Headline <span className="text-red-500">*</span></label>
+                            
+                             <div className="col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Professional Headline</label>
                                 <input 
                                     type="text" 
                                     value={formData.headline}
-                                    onChange={(e) => handleChange('headline', e.target.value)}
-                                    className={`w-full px-4 py-2 border rounded-lg focus:ring-black focus:border-black ${errors.headline ? 'border-red-500' : 'border-gray-300'}`}
-                                    placeholder="Senior Product Designer | React Developer" 
+                                    onChange={(e) => setFormData(prev => ({...prev, headline: e.target.value}))}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" 
+                                    placeholder="Senior Software Engineer" 
                                 />
-                                {errors.headline && <p className="text-red-500 text-xs mt-1">{errors.headline}</p>}
-                                <p className="text-xs text-gray-500 mt-1">A short summary of your professional identity.</p>
                             </div>
-                            <div className="col-span-1">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+
+                            <div className="col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
                                 <input 
                                     type="text" 
-                                    value={formData.city}
-                                    onChange={(e) => handleChange('city', e.target.value)}
+                                    value={formData.contact.location}
+                                    onChange={(e) => updateContact('location', e.target.value)}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" 
-                                    placeholder="San Francisco" 
+                                    placeholder="City, Country" 
                                 />
                             </div>
-                            <div className="col-span-1">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-                                <input 
-                                     type="text" 
-                                     value={formData.country}
-                                     onChange={(e) => handleChange('country', e.target.value)}
-                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" 
-                                     placeholder="USA" 
-                                />
-                            </div>
+                            
                              <div className="col-span-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">LinkedIn URL</label>
                                 <input 
                                     type="url" 
-                                    value={formData.linkedin}
-                                    onChange={(e) => handleChange('linkedin', e.target.value)}
+                                    value={formData.contact.linkedin}
+                                    onChange={(e) => updateContact('linkedin', e.target.value)}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" 
                                     placeholder="linkedin.com/in/johndoe" 
                                 />
                             </div>
-                            <div className="col-span-1">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Portfolio URL</label>
+                             <div className="col-span-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Website / Portfolio</label>
                                 <input 
                                     type="url" 
-                                    value={formData.portfolio}
-                                    onChange={(e) => handleChange('portfolio', e.target.value)}
+                                    value={formData.contact.website}
+                                    onChange={(e) => updateContact('website', e.target.value)}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" 
                                     placeholder="johndoe.com" 
                                 />
@@ -336,8 +391,8 @@ export const ResumeBuilderPage = () => {
                                                         <input 
                                                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" 
                                                             placeholder="Senior Software Engineer"
-                                                            value={exp.title}
-                                                            onChange={(e) => updateExperience(exp.id, 'title', e.target.value)}
+                                                            value={exp.role}
+                                                            onChange={(e) => updateExperience(exp.id, 'role', e.target.value)}
                                                         />
                                                     </div>
                                                     <div>
@@ -348,6 +403,48 @@ export const ResumeBuilderPage = () => {
                                                             value={exp.company}
                                                             onChange={(e) => updateExperience(exp.id, 'company', e.target.value)}
                                                         />
+                                                    </div>
+                                                    
+                                                     <div>
+                                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Location</label>
+                                                        <input 
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" 
+                                                            placeholder="New York, NY"
+                                                            value={exp.location}
+                                                            onChange={(e) => updateExperience(exp.id, 'location', e.target.value)}
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Start Date</label>
+                                                        <input 
+                                                            type="month"
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" 
+                                                            value={exp.startDate}
+                                                            onChange={(e) => updateExperience(exp.id, 'startDate', e.target.value)}
+                                                        />
+                                                    </div>
+
+                                                     <div>
+                                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">End Date</label>
+                                                        <input 
+                                                            type="month"
+                                                            disabled={exp.current}
+                                                            className={`w-full px-3 py-2 border border-gray-300 rounded-md text-sm ${exp.current ? 'bg-gray-100 text-gray-400' : ''}`}
+                                                            value={exp.endDate}
+                                                            onChange={(e) => updateExperience(exp.id, 'endDate', e.target.value)}
+                                                        />
+                                                    </div>
+                                                    
+                                                    <div className="md:col-span-2 flex items-center">
+                                                        <input 
+                                                            type="checkbox"
+                                                            id={`current-${exp.id}`}
+                                                            className="h-4 w-4 text-black border-gray-300 rounded focus:ring-black"
+                                                            checked={exp.current}
+                                                            onChange={(e) => updateExperience(exp.id, 'current', e.target.checked)}
+                                                        />
+                                                        <label htmlFor={`current-${exp.id}`} className="ml-2 text-sm text-gray-700">I currently work here</label>
                                                     </div>
                                                     <div className="col-span-2">
                                                         <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Description</label>
@@ -410,19 +507,58 @@ export const ResumeBuilderPage = () => {
                                                         <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Degree</label>
                                                         <input 
                                                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" 
-                                                            placeholder="Bachelor of Science in CS"
+                                                            placeholder="Bachelor of Science"
                                                             value={edu.degree}
                                                             onChange={(e) => updateEducation(edu.id, 'degree', e.target.value)}
                                                         />
                                                     </div>
-                                                     <div>
-                                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Graduation Year</label>
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Field of Study</label>
                                                         <input 
                                                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" 
-                                                            placeholder="2024"
-                                                            value={edu.year}
-                                                            onChange={(e) => updateEducation(edu.id, 'year', e.target.value)}
+                                                            placeholder="Computer Science"
+                                                            value={edu.field}
+                                                            onChange={(e) => updateEducation(edu.id, 'field', e.target.value)}
                                                         />
+                                                    </div>
+                                                     <div>
+                                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Location</label>
+                                                        <input 
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" 
+                                                            placeholder="Boston, MA"
+                                                            value={edu.location}
+                                                            onChange={(e) => updateEducation(edu.id, 'location', e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Start Date</label>
+                                                        <input 
+                                                            type="month"
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" 
+                                                            value={edu.startDate}
+                                                            onChange={(e) => updateEducation(edu.id, 'startDate', e.target.value)}
+                                                        />
+                                                    </div>
+                                                     <div>
+                                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">End Date</label>
+                                                        <input 
+                                                            type="month"
+                                                            disabled={edu.current}
+                                                            className={`w-full px-3 py-2 border border-gray-300 rounded-md text-sm ${edu.current ? 'bg-gray-100 text-gray-400' : ''}`}
+                                                            value={edu.endDate}
+                                                            onChange={(e) => updateEducation(edu.id, 'endDate', e.target.value)}
+                                                        />
+                                                    </div>
+                                                    
+                                                    <div className="md:col-span-2 flex items-center">
+                                                        <input 
+                                                            type="checkbox"
+                                                            id={`current-edu-${edu.id}`}
+                                                            className="h-4 w-4 text-black border-gray-300 rounded focus:ring-black"
+                                                            checked={edu.current}
+                                                            onChange={(e) => updateEducation(edu.id, 'current', e.target.checked)}
+                                                        />
+                                                        <label htmlFor={`current-edu-${edu.id}`} className="ml-2 text-sm text-gray-700">I currently study here</label>
                                                     </div>
                                                 </div>
                                             </div>
@@ -439,24 +575,86 @@ export const ResumeBuilderPage = () => {
                             </div>
                          )}
 
-                         {/* Step 3: Skills */}
-                         {currentStep === 3 && (
+                        {/* Step 3: Skills */}
+                        {currentStep === 3 && (
                             <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Key Skills</label>
-                                    <textarea 
-                                        rows={6} 
-                                        value={formData.skills}
-                                        onChange={(e) => handleChange('skills', e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" 
-                                        placeholder="React, TypeScript, Node.js, Project Management, Figma..."
-                                    ></textarea>
-                                    <div className="flex gap-2 flex-wrap mt-3">
-                                        {['React', 'Communication', 'Python', 'Leadership'].map(skill => (
-                                            <button key={skill} onClick={() => handleChange('skills', formData.skills ? `${formData.skills}, ${skill}` : skill)} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-full border border-gray-200 transition">
-                                                + {skill}
+                                <div className="space-y-6">
+                                     <div className="text-center border-2 border-dashed border-gray-200 rounded-xl py-8 mb-6">
+                                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <span className="material-symbols-outlined text-gray-400 text-3xl">psychology</span>
+                                        </div>
+                                        <h3 className="text-lg font-bold text-gray-900 mb-2">Key Skills</h3>
+                                        <p className="text-gray-500 px-12">Highlight your technical and soft skills.</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Add a Skill</label>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="text"
+                                                id="skillInput"
+                                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" 
+                                                placeholder="e.g. React, Project Management"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        const val = e.currentTarget.value;
+                                                        if(val) {
+                                                            addSkill(val);
+                                                            e.currentTarget.value = '';
+                                                        }
+                                                    }
+                                                }}
+                                            />
+                                            <button 
+                                                onClick={() => {
+                                                    const input = document.getElementById('skillInput') as HTMLInputElement;
+                                                    if (input && input.value) {
+                                                        addSkill(input.value);
+                                                        input.value = '';
+                                                    }
+                                                }}
+                                                className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition"
+                                            >
+                                                Add
                                             </button>
-                                        ))}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h4 className="text-sm font-medium text-gray-700 mb-3">Your Skills</h4>
+                                        {formData.skills.length === 0 ? (
+                                            <p className="text-gray-400 text-sm italic">No skills added yet.</p>
+                                        ) : (
+                                            <div className="flex flex-wrap gap-2">
+                                                {formData.skills.map(skill => (
+                                                    <div key={skill.id} className="bg-gray-100 text-gray-800 px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 group border border-gray-200">
+                                                        {skill.name}
+                                                        <button 
+                                                            onClick={() => removeSkill(skill.id)}
+                                                            className="text-gray-400 hover:text-red-500 transition-colors"
+                                                        >
+                                                            <span className="material-symbols-outlined text-[16px]">close</span>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="pt-4 border-t border-gray-100">
+                                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Suggested Skills</h4>
+                                        <div className="flex gap-2 flex-wrap">
+                                            {['Communication', 'Leadership', 'Problem Solving', 'Teamwork', 'Agile'].map(skill => (
+                                                <button 
+                                                    key={skill} 
+                                                    onClick={() => addSkill(skill)} 
+                                                    className="text-xs bg-white hover:bg-gray-50 text-gray-600 px-3 py-1 rounded-full border border-gray-200 transition dashed"
+                                                >
+                                                    + {skill}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -470,7 +668,7 @@ export const ResumeBuilderPage = () => {
                                     <textarea 
                                         rows={8} 
                                         value={formData.summary}
-                                        onChange={(e) => handleChange('summary', e.target.value)}
+                                        onChange={(e) => setFormData(prev => ({...prev, summary: e.target.value}))}
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" 
                                         placeholder="Write 2-4 sentences summarizing your experience and top achievements..."
                                     ></textarea>
@@ -493,15 +691,12 @@ export const ResumeBuilderPage = () => {
                                 
                                 <div className="flex justify-center gap-4">
                                      <button 
-                                        onClick={() => navigate('/resumes/new-id')}
-                                        className="px-6 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                        onClick={handleSave}
+                                        disabled={isSaving}
+                                        className="px-6 py-3 bg-black text-white rounded-lg font-medium hover:bg-gray-800 shadow-lg shadow-gray-200 flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
                                      >
-                                        <span className="material-symbols-outlined">visibility</span>
-                                        View Resume & Insights
-                                    </button>
-                                    <button className="px-6 py-3 bg-black text-white rounded-lg font-medium hover:bg-gray-800 shadow-lg shadow-gray-200 flex items-center gap-2">
-                                        <span className="material-symbols-outlined">download</span>
-                                        Download PDF
+                                        <span className="material-symbols-outlined">save</span>
+                                        {isSaving ? 'Saving...' : 'Save to Dashboard'}
                                     </button>
                                 </div>
                              </div>

@@ -1,9 +1,55 @@
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { resumeService } from './services/resumeService';
+import type { Resume } from './types';
+import { toast } from 'sonner';
 
 export const ResumeDetailsPage = () => {
-    // const { id } = useParams();
-    useParams();
+    const { id } = useParams();
+    const [resume, setResume] = useState<Resume | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchResume = async () => {
+            if (!id) return;
+            try {
+                const data = await resumeService.getResumeById(id);
+                if (data) {
+                    setResume(data);
+                } else {
+                    toast.error("Resume not found");
+                }
+            } catch (error) {
+                console.error("Error fetching resume:", error);
+                toast.error("Failed to load resume details");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchResume();
+    }, [id]);
+
+    if (loading) {
+        return (
+            <DashboardLayout>
+                <div className="flex items-center justify-center h-full">
+                    <p className="text-gray-500">Loading resume...</p>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    if (!resume) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center h-full">
+                    <p className="text-gray-500 mb-4">Resume not found.</p>
+                    <Link to="/my-resumes" className="text-blue-600 hover:underline">Back to My Resumes</Link>
+                </div>
+            </DashboardLayout>
+        );
+    }
 
     return (
         <DashboardLayout>
@@ -15,8 +61,8 @@ export const ResumeDetailsPage = () => {
                             <span className="material-symbols-outlined text-gray-500">arrow_back</span>
                         </Link>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Software Engineer Resume</h1>
-                            <p className="text-sm text-gray-500">Last edited 2 days ago</p>
+                            <h1 className="text-2xl font-bold text-gray-900">{resume.title}</h1>
+                            <p className="text-sm text-gray-500">Last edited {new Date(resume.updatedAt).toLocaleDateString()}</p>
                         </div>
                         <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
                             ATS Score: 85
@@ -38,39 +84,69 @@ export const ResumeDetailsPage = () => {
                     {/* Left: Resume Preview (Scrollable) */}
                     <div className="lg:col-span-2 bg-gray-100 rounded-2xl p-8 overflow-y-auto border border-gray-200 shadow-inner">
                         <div className="bg-white max-w-[800px] mx-auto min-h-[1000px] shadow-sm p-12">
-                             {/* Mock Resume Content */}
+                             {/* Resume Content */}
                              <div className="text-center border-b border-gray-200 pb-8 mb-8">
-                                <h1 className="text-3xl font-bold text-gray-900 mb-2">John Doe</h1>
-                                <p className="text-gray-600">Software Engineer | React Specialist</p>
-                                <div className="flex justify-center gap-4 text-sm text-gray-500 mt-4">
-                                    <span>lagos, Nigeria</span>
-                                    <span>•</span>
-                                    <span>john@example.com</span>
-                                    <span>•</span>
-                                    <span>linkedin.com/in/johndoe</span>
+                                <h1 className="text-3xl font-bold text-gray-900 mb-2">{resume.contact.fullName}</h1>
+                                <p className="text-gray-600">{resume.headline}</p>
+                                <div className="flex justify-center gap-4 text-sm text-gray-500 mt-4 flex-wrap">
+                                    {resume.contact.location && <span>{resume.contact.location}</span>}
+                                    {resume.contact.location && <span>•</span>}
+                                    <span>{resume.contact.email}</span>
+                                    {resume.contact.website && (
+                                        <>
+                                            <span>•</span>
+                                            <span>{resume.contact.website}</span>
+                                        </>
+                                    )}
                                 </div>
                              </div>
 
                              <div className="mb-8">
                                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-200 pb-2 mb-4">Professional Summary</h3>
                                 <p className="text-sm text-gray-700 leading-relaxed">
-                                    Experienced Frontend Developer with 5+ years of expertise in building scalable web applications using React and TypeScript. Proven track record of improving site performance by 40% and leading cross-functional teams in agile environments.
+                                    {resume.summary}
                                 </p>
                              </div>
 
                              <div className="mb-8">
                                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-200 pb-2 mb-4">Work Experience</h3>
-                                <div className="mb-6">
-                                    <div className="flex justify-between mb-1">
-                                        <h4 className="font-bold text-gray-900">Senior Frontend Engineer</h4>
-                                        <span className="text-sm text-gray-500">Jan 2021 - Present</span>
-                                    </div>
-                                    <p className="text-sm text-gray-700 font-medium mb-2">TechCorp Nigeria, Lagos</p>
-                                    <ul className="list-disc list-outside ml-4 space-y-1 text-sm text-gray-700">
-                                        <li>Architected and launched the company's main payment dashboard serving 50k+ users.</li>
-                                        <li>Reduced initial load time by 40% through code splitting and lazy loading strategies.</li>
-                                        <li>Mentored 3 junior developers and established code quality standards.</li>
-                                    </ul>
+                                <div className="space-y-6">
+                                    {resume.experience.map((exp) => (
+                                        <div key={exp.id}>
+                                            <div className="flex justify-between mb-1">
+                                                <h4 className="font-bold text-gray-900">{exp.role}</h4>
+                                                <span className="text-sm text-gray-500">{exp.startDate} - {exp.current ? 'Present' : exp.endDate}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-700 font-medium mb-2">{exp.company}, {exp.location}</p>
+                                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{exp.description}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                             </div>
+
+                             <div className="mb-8">
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-200 pb-2 mb-4">Education</h3>
+                                <div className="space-y-4">
+                                    {resume.education.map((edu) => (
+                                        <div key={edu.id}>
+                                            <div className="flex justify-between mb-1">
+                                                <h4 className="font-bold text-gray-900">{edu.school}</h4>
+                                                <span className="text-sm text-gray-500">{edu.startDate} - {edu.current ? 'Present' : edu.endDate}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-700">{edu.degree} in {edu.field}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                             </div>
+
+                             <div className="mb-8">
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-200 pb-2 mb-4">Skills</h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {resume.skills.map((skill) => (
+                                        <span key={skill.id} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-xs font-medium border border-gray-200">
+                                            {skill.name}
+                                        </span>
+                                    ))}
                                 </div>
                              </div>
                         </div>
@@ -89,29 +165,10 @@ export const ResumeDetailsPage = () => {
                                     <div className="flex items-start gap-3">
                                         <span className="material-symbols-outlined text-green-600 text-sm mt-1">check_circle</span>
                                         <div>
-                                            <p className="text-sm font-bold text-green-800">Strong Impact Verbs</p>
-                                            <p className="text-xs text-green-700 mt-1">Great job using "Architected", "Launched", "Mentored". Profiles with strong action verbs get 2x more interviews.</p>
+                                            <p className="text-sm font-bold text-green-800">Resume Optimized</p>
+                                            <p className="text-xs text-green-700 mt-1">Your content has been polished by AI for better impact and readability.</p>
                                         </div>
                                     </div>
-                                </div>
-                                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                                    <div className="flex items-start gap-3">
-                                        <span className="material-symbols-outlined text-blue-600 text-sm mt-1">info</span>
-                                        <div>
-                                            <p className="text-sm font-bold text-blue-800">Formatting Check</p>
-                                            <p className="text-xs text-blue-700 mt-1">Your bullet points are concise and easy to scan. This is optimal for ATS parsers.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
-                                    <div className="flex items-start gap-3">
-                                        <span className="material-symbols-outlined text-yellow-600 text-sm mt-1">warning</span>
-                                        <div>
-                                            <p className="text-sm font-bold text-yellow-800">Missing Key Skill</p>
-                                            <p className="text-xs text-yellow-700 mt-1">Based on your "Software Engineer" title, job market trends show <strong>Next.js</strong> is high demand.</p>
-                                        </div>
-                                    </div>
-                                    <button className="mt-3 text-xs font-semibold text-yellow-800 hover:underline">Auto-Add to Skills</button>
                                 </div>
                             </div>
                         </div>

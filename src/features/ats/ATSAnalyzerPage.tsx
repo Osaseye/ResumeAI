@@ -1,11 +1,27 @@
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { toast } from 'sonner';
+import { fileParser } from '@/services/fileParser';
+import { vertexService } from '@/features/ai/services/vertexService';
+import { useAuth } from '@/features/auth/AuthContext';
+
+interface ATSAnalysisResult {
+    score: number;
+    matchedKeywords: string[];
+    missingKeywords: string[];
+    summary: string;
+    role?: string;
+    company?: string;
+}
 
 export const ATSAnalyzerPage = () => {
+    const { user } = useAuth();
     const [file, setFile] = useState<File | null>(null);
+    const [jobDescription, setJobDescription] = useState('');
     const [analyzing, setAnalyzing] = useState(false);
     const [step, setStep] = useState(1); // 1: Upload, 2: Job Target, 3: Results
+    const [result, setResult] = useState<ATSAnalysisResult | null>(null);
 
     const onDrop = (acceptedFiles: File[]) => {
         if (acceptedFiles.length > 0) {
@@ -19,14 +35,43 @@ export const ATSAnalyzerPage = () => {
         maxFiles: 1
     });
 
-    const handleAnalyze = () => {
+    const handleAnalyze = async () => {
+        if (!file || !jobDescription.trim()) {
+            toast.error("Please provide both a resume and a job description.");
+            return;
+        }
+
         setAnalyzing(true);
-        // Simulate analysis
-        setTimeout(() => {
-            setAnalyzing(false);
+        try {
+            // 1. Extract text from resume
+            const resumeText = await fileParser.extractText(file);
+            
+            // 2. Analyze with AI
+            const analysis = await vertexService.analyzeMatch(resumeText, jobDescription);
+            
+            setResult(analysis);
             setStep(3);
-        }, 3000);
+            toast.success("Analysis complete!");
+        } catch (error) {
+            console.error("Analysis failed:", error);
+            toast.error("Failed to analyze resume. Please try again.");
+        } finally {
+            setAnalyzing(false);
+        }
     };
+
+    const getScoreColor = (score: number) => {
+        if (score >= 80) return 'text-green-500';
+        if (score >= 60) return 'text-yellow-500';
+        return 'text-red-500';
+    };
+
+    const getScoreStroke = (score: number) => {
+         // Circumference is approx 440 (2 * pi * 70)
+         const max = 440;
+         const offset = max - (score / 100) * max;
+         return offset;
+    }
 
     return (
         <DashboardLayout>
@@ -73,7 +118,7 @@ export const ATSAnalyzerPage = () => {
                     </div>
                 )}
 
-                {step === 2 && (
+                {step === 2 && !analyzing && (
                     <div className="bg-white rounded-3xl shadow-soft p-12 max-w-2xl mx-auto">
                          <button onClick={() => setStep(1)} className="flex items-center text-gray-500 hover:text-gray-900 mb-6 text-sm">
                             <span className="material-symbols-outlined text-sm mr-1">arrow_back</span> Back
@@ -81,22 +126,21 @@ export const ATSAnalyzerPage = () => {
                         <h2 className="text-2xl font-bold text-gray-900 mb-6">Target Job Details</h2>
                         <div className="space-y-6">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Job Title</label>
-                                <input type="text" className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-black focus:border-black" placeholder="e.g. Senior Frontend Engineer" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Job Description (Optional)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Job Description <span className="text-red-500">*</span></label>
                                 <div className="relative">
                                      <textarea 
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-black focus:border-black h-40" 
-                                        placeholder="Paste the job description here for better matching..."
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-black focus:border-black h-60" 
+                                        placeholder="Paste the full job description here..."
+                                        value={jobDescription}
+                                        onChange={(e) => setJobDescription(e.target.value)}
                                     ></textarea>
-                                    <div className="absolute bottom-3 right-3 text-xs text-gray-400">0/5000</div>
                                 </div>
+                                <p className="text-xs text-gray-500 mt-2">Our AI scoring engine will compare your resume against these requirements.</p>
                             </div>
                             <button 
                                 onClick={handleAnalyze} 
-                                className="w-full bg-black text-white py-4 rounded-xl font-bold hover:bg-gray-800 transition-all shadow-lg flex items-center justify-center gap-2"
+                                disabled={!jobDescription.trim()}
+                                className="w-full bg-black text-white py-4 rounded-xl font-bold hover:bg-gray-800 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <span className="material-symbols-outlined">analytics</span>
                                 Analyze Resume
@@ -105,7 +149,7 @@ export const ATSAnalyzerPage = () => {
                     </div>
                 )}
 
-                {step === 2 && analyzing && (
+                {analyzing && (
                     <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
                         <div className="w-20 h-20 border-4 border-gray-200 border-t-black rounded-full animate-spin mb-6"></div>
                         <h3 className="text-2xl font-bold text-gray-900">Analyzing your resume...</h3>
@@ -113,86 +157,97 @@ export const ATSAnalyzerPage = () => {
                     </div>
                 )}
 
-                {step === 3 && (
-                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {step === 3 && result && (
+                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 text-left">
                         <div className="lg:col-span-1 space-y-6">
                             <div className="bg-white p-6 rounded-3xl shadow-soft text-center">
                                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">ATS Match Score</h3>
                                 <div className="relative w-40 h-40 mx-auto mb-4">
                                     <svg className="w-full h-full transform -rotate-90">
                                         <circle className="text-gray-100" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" strokeWidth="12"></circle>
-                                        <circle className="text-green-500" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" strokeDasharray="440" strokeDashoffset="110" strokeLinecap="round" strokeWidth="12"></circle>
+                                        <circle 
+                                            className={getScoreColor(result.score)} 
+                                            cx="80" cy="80" 
+                                            fill="transparent" 
+                                            r="70" 
+                                            stroke="currentColor" 
+                                            strokeDasharray="440" 
+                                            strokeDashoffset={getScoreStroke(result.score)} 
+                                            strokeLinecap="round" 
+                                            strokeWidth="12"
+                                        ></circle>
                                     </svg>
                                     <div className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center">
-                                        <span className="text-4xl font-bold text-gray-900">75</span>
+                                        <span className="text-4xl font-bold text-gray-900">{result.score}</span>
                                         <span className="text-sm text-gray-400">/ 100</span>
                                     </div>
                                 </div>
-                                <p className="text-sm text-gray-600">Great start! Improve keywords to reach 85+.</p>
+                                <p className="text-sm text-gray-600">
+                                    {result.score >= 80 ? "Excellent match! " : result.score >= 60 ? "Good start. " : "Needs improvement. "}
+                                    Targeting: <strong>{result.role || 'Job'}</strong> at <strong>{result.company || 'Company'}</strong>.
+                                </p>
                             </div>
                             
-                            <div className="bg-white p-6 rounded-3xl shadow-soft">
-                                <h3 className="font-bold text-gray-900 mb-4">Critical Issues</h3>
-                                <div className="space-y-3">
-                                    <div className="flex items-start gap-3 p-3 bg-red-50 rounded-xl">
-                                        <span className="material-symbols-outlined text-red-500 mt-0.5">error</span>
-                                        <div>
-                                            <h4 className="text-sm font-bold text-red-700">Missing Keywords</h4>
-                                            <p className="text-xs text-red-600 mt-1">"React", "TypeScript", "Agile" not found in experience.</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-xl">
-                                        <span className="material-symbols-outlined text-yellow-600 mt-0.5">warning</span>
-                                        <div>
-                                            <h4 className="text-sm font-bold text-yellow-700">Formatting Risk</h4>
-                                            <p className="text-xs text-yellow-600 mt-1">Header columns might be unreadable by older ATS.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <button 
+                                onClick={() => { setStep(1); setFile(null); setJobDescription(''); setResult(null); }}
+                                className="w-full py-3 border border-gray-200 rounded-xl font-medium text-gray-600 hover:bg-gray-50 block"
+                            >
+                                Analyze Another
+                            </button>
                         </div>
 
                         <div className="lg:col-span-2 bg-white rounded-3xl shadow-soft p-8">
                              <div className="flex items-center justify-between mb-6">
                                 <h2 className="text-2xl font-bold text-gray-900">Detailed Analysis</h2>
-                                <button className="text-blue-600 font-medium text-sm hover:underline">Download Report</button>
+                                {/* <button className="text-blue-600 font-medium text-sm hover:underline">Download Report</button> */}
                              </div>
                              
                              <div className="space-y-8">
                                 <div>
                                     <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-green-500">check_circle</span>
-                                        Contact Information
+                                        <span className="material-symbols-outlined text-blue-500">info</span>
+                                        Summary
                                     </h3>
                                     <p className="text-gray-600 text-sm leading-relaxed pl-8">
-                                        Your contact details are clear and easily found. Email address and phone number are properly formatted. Location is present.
+                                        {result.summary}
                                     </p>
                                 </div>
+                                
                                 <div className="border-t border-gray-100 pt-6">
                                     <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-yellow-500">warning</span>
-                                        Impact & Metrics
+                                        <span className="material-symbols-outlined text-green-500">check_circle</span>
+                                        Matched Keywords
                                     </h3>
-                                    <p className="text-gray-600 text-sm leading-relaxed pl-8">
-                                        You have strong action verbs, but only <span className="font-bold text-gray-900">14%</span> of your bullet points contain measurable metrics (%, $, numbers). Aim for at least 40% to demonstrate value.
-                                    </p>
-                                    <div className="mt-4 pl-8">
-                                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                                            <p className="text-xs text-gray-500 uppercase font-bold mb-2">Suggestion</p>
-                                            <p className="text-sm text-gray-800">Instead of "Improved site performance", try "Improved site performance by <span className="text-green-600 font-bold">25%</span> which led to a <span className="text-green-600 font-bold">10%</span> increase in conversion."</p>
-                                        </div>
+                                    <div className="pl-8 flex flex-wrap gap-2">
+                                        {result.matchedKeywords.length > 0 ? (
+                                            result.matchedKeywords.map((kw, i) => (
+                                                <span key={i} className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-xs font-semibold border border-green-100">{kw}</span>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-gray-500">No strong keyword matches found.</p>
+                                        )}
                                     </div>
                                 </div>
+
                                 <div className="border-t border-gray-100 pt-6">
                                     <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
                                         <span className="material-symbols-outlined text-red-500">error</span>
-                                        Skills Gap
+                                        Missing Keywords
                                     </h3>
                                     <div className="pl-8 flex flex-wrap gap-2">
-                                        <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-xs font-semibold border border-red-100">Next.js</span>
-                                        <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-xs font-semibold border border-red-100">GraphQL</span>
-                                        <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-xs font-semibold border border-red-100">Tailwind CSS</span>
+                                        {result.missingKeywords.length > 0 ? (
+                                            result.missingKeywords.map((kw, i) => (
+                                                <span key={i} className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-xs font-semibold border border-red-100">{kw}</span>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-gray-500">No major keywords missing!</p>
+                                        )}
                                     </div>
+                                    {result.missingKeywords.length > 0 && (
+                                        <p className="text-xs text-gray-500 mt-3 pl-8">
+                                            Tip: Try incorporating these keywords into your skills or experience sections naturally.
+                                        </p>
+                                    )}
                                 </div>
                              </div>
                         </div>

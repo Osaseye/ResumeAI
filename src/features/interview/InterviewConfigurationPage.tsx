@@ -2,16 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 
-const MOCK_RESUMES = [
-    { id: '1', title: 'Software Engineer Resume', date: '2 days ago' },
-    { id: '2', title: 'Product Manager Resume', date: '1 week ago' },
-];
+const MOCK_RESUMES: {id: string, title: string, date: string}[] = [];
 
-const MOCK_JOBS = [
-    { id: '1', title: 'Senior Frontend Developer', company: 'Paystack', location: 'Lagos (Hybrid)' },
-    { id: '2', title: 'Backend Engineer', company: 'Flutterwave', location: 'Remote (Nigeria)' },
-    { id: '3', title: 'Product Designer', company: 'Kuda Bank', location: 'Lagos' },
-];
+const MOCK_JOBS: {id: string, title: string, company: string, location: string}[] = [];
 
 export const InterviewConfigurationPage = () => {
     const navigate = useNavigate();
@@ -57,7 +50,18 @@ export const InterviewConfigurationPage = () => {
                                 Select Resume
                             </h2>
                             <div className="space-y-3">
-                                {MOCK_RESUMES.map((resume) => (
+                                {MOCK_RESUMES.length === 0 ? (
+                                    <div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                         <p className="text-sm text-gray-500 mb-2">No resumes found</p>
+                                         <button 
+                                            onClick={() => navigate('/resume-builder')}
+                                            className="text-blue-600 font-medium text-xs hover:underline"
+                                         >
+                                            Create a resume first
+                                         </button>
+                                    </div>
+                                ) : (
+                                    MOCK_RESUMES.map((resume) => (
                                     <div 
                                         key={resume.id}
                                         onClick={() => setSelectedResume(resume.id)}
@@ -75,7 +79,8 @@ export const InterviewConfigurationPage = () => {
                                         </div>
                                         <p className="text-xs text-gray-400 mt-1">Edited {resume.date}</p>
                                     </div>
-                                ))}
+                                ))
+                                )}
                                 <button className="w-full py-3 border border-dashed border-gray-300 rounded-xl text-gray-500 hover:bg-gray-50 hover:border-gray-400 transition text-sm font-medium flex items-center justify-center gap-2">
                                     <span className="material-symbols-outlined text-sm">add</span>
                                     Upload New Resume
@@ -89,7 +94,17 @@ export const InterviewConfigurationPage = () => {
                                 Target Job
                             </h2>
                             <div className="space-y-3">
-                                {MOCK_JOBS.map((job) => (
+                                {MOCK_JOBS.length === 0 ? (
+                                    <div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                         <p className="text-sm text-gray-500 mb-2">No jobs saved</p>
+                                         <button 
+                                            onClick={() => navigate('/jobs')}
+                                            className="text-purple-600 font-medium text-xs hover:underline"
+                                         >
+                                            Find jobs to practice for
+                                         </button>
+                                    </div>
+                                ) : ( MOCK_JOBS.map((job) => (
                                     <div 
                                         key={job.id}
                                         onClick={() => setSelectedJob(job.id)}
@@ -113,7 +128,7 @@ export const InterviewConfigurationPage = () => {
                                             {job.location}
                                         </p>
                                     </div>
-                                ))}
+                                )))}
                             </div>
                         </section>
                     </div>

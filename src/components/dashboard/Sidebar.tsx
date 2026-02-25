@@ -66,7 +66,7 @@ export const Sidebar = () => {
                     >
                         <span className={`material-symbols-outlined mr-3 text-[22px] ${isActive('/jobs') ? 'filled' : ''}`}>work</span>
                         <span className="font-medium text-sm">Job Matches</span>
-                        <span className="ml-auto bg-gray-900 text-white py-0.5 px-2 rounded-md text-[10px] font-bold">12</span>
+                        <span className="ml-auto bg-gray-100 text-gray-400 py-0.5 px-2 rounded-md text-[10px] font-bold">0</span>
                     </Link>
 
                     <Link 

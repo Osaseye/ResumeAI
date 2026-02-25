@@ -33,6 +33,8 @@ import { JobDetailsPage } from '@/features/jobs/JobDetailsPage';
 import { ResumeDetailsPage } from '@/features/resumes/ResumeDetailsPage';
 import { CoverLetterDetailsPage } from '@/features/cover-letter/CoverLetterDetailsPage';
 
+import { OnboardingPage } from '@/features/auth/OnboardingPage';
+
 const LandingPage = () => (
   <>
     <Navbar />
@@ -54,6 +56,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/my-resumes" element={<MyResumesPage />} />

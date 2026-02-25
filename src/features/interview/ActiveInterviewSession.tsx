@@ -12,8 +12,8 @@ interface Message {
 }
 
 const MOCK_QUESTIONS = [
-  "Can you describe a challenging technical problem you've solved recently?",
-  "Do you have any questions for us?"
+  "This is a placeholder for dynamic questions.",
+  "Please configure real resume and job context to receive tailored questions."
 ];
 
 export const ActiveInterviewSession = () => {
@@ -39,7 +39,7 @@ export const ActiveInterviewSession = () => {
     {
       id: '1',
       role: 'ai',
-      content: "Hello! I'm your AI interviewer today. I've reviewed your resume and the job description. Let's start with a simple introduction. Tell me about yourself.",
+      content: "Hello! I'm your AI interviewer. Please select a resume and job description in the configuration page to start a real session.",
       timestamp: new Date()
     }
   ]);
@@ -183,7 +183,8 @@ export const ActiveInterviewSession = () => {
             <div className="flex-1 md:text-center space-y-0.5 md:space-y-2">
                 <h2 className="text-white font-semibold text-sm md:text-xl">AI Interviewer</h2>
                 <p className="text-gray-400 text-xs md:text-sm truncate">
-                    {isSpeaking ? 'Speaking...' : isListening ? 'Listening...' : 'Waiting...'}
+                    {/* Placeholder status */}
+                    Waiting...
                 </p>
             </div>
 

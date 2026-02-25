@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../../lib/firebase';
 
 const registerSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -16,6 +18,7 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 
 export const RegisterForm = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const navigate = useNavigate();
 
   const {
@@ -29,18 +32,28 @@ export const RegisterForm = () => {
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
     try {
-      // Build a promise that resolves after 1.5 seconds
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await createUserWithEmailAndPassword(auth, data.email, data.password);
       
       console.log('Register data:', data);
       toast.success('Account created successfully!', {
-        description: 'Welcome to Resume AI. You can now log in.',
+        description: 'Welcome to Resume AI. Let us setup your profile.',
       });
-      navigate('/login');
-    } catch (error) {
-      toast.error('Registration failed', {
-        description: 'Something went wrong. Please try again.',
+      // Navigate to onboarding with user data
+      navigate('/onboarding', { 
+        state: { 
+          firstName: data.firstName, 
+          lastName: data.lastName 
+        } 
       });
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      let errorMessage = 'Registration failed. Please try again.';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'Email already in use. Please log in.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak.';
+      }
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -104,17 +117,34 @@ export const RegisterForm = () => {
 
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
-          <div className="mt-1">
+            <div className="mt-1 relative">
             <input
               id="password"
-              type="password"
+              type={isPasswordVisible ? "text" : "password"}
               autoComplete="new-password"
-              className={`appearance-none block w-full px-3 py-3 border ${errors.password ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-black focus:border-black'} rounded-xl shadow-sm placeholder-gray-400 focus:outline-none sm:text-sm transition-colors`}
+              className={`appearance-none block w-full px-3 py-3 pr-10 border ${errors.password ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-black focus:border-black'} rounded-xl shadow-sm placeholder-gray-400 focus:outline-none sm:text-sm transition-colors`}
               placeholder="Create a password"
               disabled={isLoading}
               {...register('password')}
             />
-          </div>
+            <button
+              type="button"
+              onClick={() => setIsPasswordVisible(!isPasswordVisible)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              disabled={isLoading}
+            >
+              {isPasswordVisible ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-4.803m5.596-3.856a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z" />
+              </svg>
+              ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              )}
+            </button>
+            </div>
           {errors.password ? (
             <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
           ) : (

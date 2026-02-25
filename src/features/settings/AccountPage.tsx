@@ -1,23 +1,67 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { toast } from 'sonner';
+import { useAuth } from '@/features/auth/AuthContext';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export const AccountPage = () => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
-    fullName: 'Alex Johnson',
-    email: 'alex@example.com',
-    phone: '+1 (555) 123-4567',
+    fullName: '',
+    email: '',
+    phone: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
 
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (user?.uid) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            setFormData(prev => ({
+              ...prev,
+              fullName: data.displayName || '',
+              // If email is not in firestore, fallback to auth email
+              email: data.email || user.email || '',
+              phone: data.phone || ''
+            }));
+          } else {
+             // Fallback if no firestore doc yet
+             setFormData(prev => ({
+                 ...prev,
+                 email: user.email || ''
+             }));
+          }
+        } catch (error) {
+          console.error("Error fetching profile:", error);
+        }
+      }
+    };
+    fetchUserProfile();
+  }, [user]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSaveProfile = () => {
-    toast.success('Profile updated successfully');
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        displayName: formData.fullName,
+        email: formData.email,
+        phone: formData.phone
+      }, { merge: true });
+      toast.success('Profile updated successfully');
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast.error('Failed to update profile');
+    }
   };
 
   const handleUpdatePassword = () => {
@@ -41,7 +85,7 @@ export const AccountPage = () => {
             <h2 className="text-xl font-semibold mb-6">Personal Information</h2>
             <div className="flex items-center gap-6 mb-8">
               <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-2xl">
-                {formData.fullName.split(' ').map(n => n[0]).join('')}
+                {formData.fullName ? formData.fullName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : <span className="material-symbols-outlined text-4xl">person</span>}
               </div>
               <button className="text-indigo-600 font-medium text-sm hover:underline">Change Avatar</button>
             </div>

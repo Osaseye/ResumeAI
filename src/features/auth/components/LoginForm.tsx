@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../../lib/firebase';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -14,6 +16,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const {
@@ -27,18 +30,20 @@ export const LoginForm = () => {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      // Build a promise that resolves after 1.5 seconds
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await signInWithEmailAndPassword(auth, data.email, data.password);
       
       console.log('Login data:', data);
       toast.success('Successfully logged in!', {
         description: 'Welcome back to Resume AI.',
       });
       navigate('/dashboard');
-    } catch (error) {
-      toast.error('Login failed', {
-        description: 'Please check your credentials and try again.',
-      });
+    } catch (error: any) {
+      console.error('Login error:', error);
+      let message = 'Login failed. Please check your credentials.';
+      if (error.code === 'auth/invalid-credential') {
+        message = 'Invalid email or password.';
+      }
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -75,13 +80,30 @@ export const LoginForm = () => {
           <div className="mt-1">
             <input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               className={`appearance-none block w-full px-3 py-3 border ${errors.password ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-black focus:border-black'} rounded-xl shadow-sm placeholder-gray-400 focus:outline-none sm:text-sm transition-colors`}
               placeholder="••••••••"
               disabled={isLoading}
               {...register('password')}
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              tabIndex={-1}
+            >
+              {showPassword ? (
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+              </svg>
+              ) : (
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-14-14zM10 3C5.522 3 1.732 5.943.458 10c1.274 4.057 5.064 7 9.542 7 1.762 0 3.469-.333 5.014-.934l-2.024-2.024A4 4 0 1010 5a4.004 4.004 0 014.914 3.99l2.024-2.024A9.951 9.951 0 0010 3z" clipRule="evenodd" />
+              </svg>
+              )}
+            </button>
             {errors.password && (
               <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
             )}

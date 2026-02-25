@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // --- Helper Functions ---
+
+    // Check if the user is signed in
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the user is accessing their own data
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if the document being created has the correct owner
+    function isOwnerCreate() {
+      return isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+    
+    // Check if the data is valid (basic validation)
+    function hasRequiredFields(requiredFields) {
+      return request.resource.data.keys().hasAll(requiredFields);
+    }
+
+    // --- Collection Rules ---
+
+    // 1. Users Collection (Access Profile)
+    match /users/{userId} {
+      // Allow users to read and write their own profile
+      allow read, write: if isOwner(userId);
+    }
+
+    // 2. Resumes Collection
+    match /resumes/{resumeId} {
+      // Create: User must be authenticated and set themselves as userId
+      allow create: if isOwnerCreate() 
+                   && hasRequiredFields(['title', 'userId', 'createdAt']);
+      
+      // Read, Update, Delete: Only the owner of the existing document
+      allow read, update, delete: if isOwner(resource.data.userId);
+    }
+    
+     // 3. User Resumes (Subcollection)
+    match /users/{userId}/resumes/{resumeId} {
+      // Allow users to access their own resumes if stored under users/{userId}
+      allow read, write: if isOwner(userId);
+    }
+
+    // 4. Cover Letters Collection (Future proofing)
+    match /coverLetters/{letterId} {
+      allow create: if isOwnerCreate();
+      allow read, update, delete: if isOwner(resource.data.userId);
+    }
+    
+    // 5. Job Matches / Applications
+    match /jobs/{jobId} {
+        // Assuming jobs typically belong to a user or are public? 
+        // If personal job tracking:
+        allow create: if isOwnerCreate();
+        allow read, update, delete: if isOwner(resource.data.userId);
+    }
+
+    // Default deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,63 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // --- Helper Functions ---
+    // Check if the user is signed in
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the user is owner of the path
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if the requested file size is under a specific limit (e.g., 5MB)
+    function isFileSizeUnder(maxSizeMB) {
+      return request.resource.size < maxSizeMB * 1024 * 1024;
+    }
+
+    // Validate MIME types (images)
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    // Validate MIME types (PDFs/Docs)
+    function isDocument() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+             request.resource.contentType.matches('application/msword');
+    }
+
+    // --- Path Specific Rules ---
+
+    // 1. Profile Pictures
+    match /users/{userId}/profile/{allPaths=**} {
+      // READ: Anyone can read profile pictures (if public profiles feature exists)
+      // If private, change to: allow read: if isAuthenticated();
+      allow read: if true; 
+
+      // WRITE: Only owner can upload, update, delete
+      allow write: if isOwner(userId) 
+                  && isFileSizeUnder(5) 
+                  && isImage();
+    }
+
+    // 2. Resume Documents (PDFs/Docx)
+    match /users/{userId}/resumes/{allPaths=**} {
+      // READ/WRITE: Only owner has access
+      allow read, write: if isOwner(userId);
+    }
+    
+    // 3. Cover Letter Documents
+    match /users/{userId}/cover_letters/{allPaths=**} {
+        allow read, write: if isOwner(userId);
+    }
+
+    // Default deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

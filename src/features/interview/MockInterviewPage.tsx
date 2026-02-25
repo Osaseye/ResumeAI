@@ -62,25 +62,25 @@ export const MockInterviewPage = () => {
                     <div>
                          <div className="flex justify-between text-sm mb-1">
                             <span className="text-gray-500">Average Score</span>
-                            <span className="font-bold text-gray-900">72/100</span>
+                            <span className="font-bold text-gray-900">- / 100</span>
                         </div>
                         <div className="w-full bg-gray-100 rounded-full h-2">
-                            <div className="bg-blue-600 h-2 rounded-full" style={{ width: '72%' }}></div>
+                            <div className="bg-blue-600 h-2 rounded-full" style={{ width: '0%' }}></div>
                         </div>
                     </div>
                      <div>
                          <div className="flex justify-between text-sm mb-1">
                             <span className="text-gray-500">Interviews Completed</span>
-                            <span className="font-bold text-gray-900">4</span>
+                            <span className="font-bold text-gray-900">0</span>
                         </div>
                         <div className="w-full bg-gray-100 rounded-full h-2">
-                            <div className="bg-green-500 h-2 rounded-full" style={{ width: '40%' }}></div>
+                            <div className="bg-green-500 h-2 rounded-full" style={{ width: '0%' }}></div>
                         </div>
                     </div>
                 </div>
             </div>
             <div className="mt-6 pt-6 border-t border-gray-100">
-                <p className="text-sm text-gray-500 italic">"You need to work on reducing filler words like 'um' and 'like'."</p>
+                <p className="text-sm text-gray-500 italic">Complete your first interview to get personalized tips.</p>
             </div>
         </div>
       </div>

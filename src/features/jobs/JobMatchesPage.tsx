@@ -7,75 +7,22 @@ export const JobMatchesPage = () => {
   const [view, setView] = useState<'matches' | 'saved'>('matches');
   const [showPreferences, setShowPreferences] = useState(false);
 
-  // Mock Data - Nigerian Context
-  const jobs = [
-    {
-      id: 1,
-      role: 'Senior Product Designer',
-      company: 'Paystack',
-      logo: 'p', 
-      logoBg: 'bg-blue-600',
-      location: 'Lagos, Nigeria (Hybrid)',
-      salary: '₦800k - ₦1.2M',
-      matchScore: 98,
-      tags: ['Figma', 'Fintech', 'Design Systems'],
-      posted: '2 days ago',
-      isSaved: true
-    },
-    {
-      id: 2,
-      role: 'Frontend Engineer',
-      company: 'Flutterwave',
-      logo: 'F',
-      logoBg: 'bg-orange-500', 
-      location: 'Remote (Nigeria)',
-      salary: '₦600k - ₦900k',
-      matchScore: 94,
-      tags: ['React', 'TypeScript', 'Tailwind'],
-      posted: '5 hours ago',
-      isSaved: false
-    },
-    {
-      id: 3,
-      role: 'UX Researcher',
-      company: 'Moniepoint',
-      logo: 'M',
-      logoBg: 'bg-indigo-600',
-      location: 'Lagos, Nigeria',
-      salary: '₦500k - ₦750k',
-      matchScore: 89,
-      tags: ['User Testing', 'Data Analysis'],
-      posted: '1 week ago',
-      isSaved: false
-    },
-    {
-      id: 4,
-      role: 'Full Stack Developer',
-      company: 'Kuda Bank',
-      logo: 'K',
-      logoBg: 'bg-purple-600',
-      location: 'Lekki Phase 1, Lagos',
-      salary: '₦1.2M - ₦1.5M',
-      matchScore: 82,
-      tags: ['Node.js', 'React Native', 'AWS'],
-      posted: '3 days ago',
-      isSaved: true
-    },
-    {
-      id: 5,
-      role: 'Backend Engineer',
-      company: 'Andela',
-      logo: 'A',
-      logoBg: 'bg-green-600',
-      location: 'Remote (Africa)',
-      salary: '$2,000 - $3,500',
-      matchScore: 78,
-      tags: ['Python', 'Django', 'PostgreSQL'],
-      posted: '1 day ago',
-      isSaved: false
-    }
-  ];
-
+  // No mock data - waiting for backend
+  interface Job {
+    id: number;
+    role: string;
+    company: string;
+    logo: string;
+    logoBg: string;
+    location: string;
+    salary: string;
+    matchScore: number;
+    tags: string[];
+    posted: string;
+    isSaved: boolean;
+  }
+  const jobs: Job[] = [];
+  
   const displayedJobs = view === 'saved' ? jobs.filter(j => j.isSaved) : jobs;
 
   return (
@@ -162,9 +109,20 @@ export const JobMatchesPage = () => {
       )}
 
       <div className="space-y-4">
-        {displayedJobs.map((job) => (
+        {displayedJobs.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                <span className="material-symbols-outlined text-4xl text-gray-300 mb-4">work_off</span>
+                <h3 className="text-lg font-medium text-gray-900">No jobs found</h3>
+                <p className="text-gray-500 max-w-sm mx-auto mt-2">
+                    {view === 'matches' 
+                        ? "Check back later for new opportunities tailored to your profile." 
+                        : "You haven't saved any jobs yet."}
+                </p>
+            </div>
+        ) : (
+            displayedJobs.map((job) => (
           <div 
-             key={job.id} 
+             key={job.id}  
              onClick={() => navigate(`/jobs/${job.id}`)}
              className="bg-white p-6 rounded-2xl shadow-soft hover:shadow-card transition-all border border-gray-100 flex flex-col md:flex-row gap-6 cursor-pointer group"
            >
@@ -235,9 +193,9 @@ export const JobMatchesPage = () => {
             </div>
 
           </div>
-        ))}
+        )))}
         
-        {displayedJobs.length === 0 && (
+        {false && displayedJobs.length === 0 && (
              <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 border-dashed">
                 <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
                     <span className="material-symbols-outlined text-gray-400 text-3xl">bookmark_off</span>

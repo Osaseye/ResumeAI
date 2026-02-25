@@ -1,10 +1,37 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
+import { useAuth } from '@/features/auth/AuthContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
+interface UserProfile {
+  displayName: string;
+}
 
 export const Header = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+        if (user?.uid) {
+            try {
+                const docRef = doc(db, 'users', user.uid);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    setProfile(docSnap.data() as UserProfile);
+                }
+            } catch (error) {
+                console.error("Error fetching profile:", error);
+            }
+        }
+    };
+
+    fetchProfile();
+  }, [user]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -61,7 +88,6 @@ export const Header = () => {
             >
             <span className="material-symbols-outlined text-[20px] relative text-gray-600">
                 notifications
-                <span className="absolute top-0 right-0.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
             </span>
             </button>
 
@@ -72,22 +98,9 @@ export const Header = () => {
                         <button className="text-xs text-indigo-600 font-medium hover:underline">Mark all read</button>
                     </div>
                     <div className="max-h-80 overflow-y-auto">
-                        {[
-                            { title: "New Job Match", desc: "Senior React Dev at Google", time: "2m ago", icon: "work", color: "text-blue-500 bg-blue-50" },
-                            { title: "Resume Score Improved", desc: "Your score went up by 5%", time: "1h ago", icon: "trending_up", color: "text-green-500 bg-green-50" },
-                            { title: "Interview Reminder", desc: "Mock session in 30 mins", time: "2h ago", icon: "videocam", color: "text-purple-500 bg-purple-50" },
-                        ].map((item, i) => (
-                            <div key={i} className="p-4 hover:bg-gray-50 cursor-pointer flex gap-3 transition border-b border-gray-50 last:border-0">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${item.color}`}>
-                                    <span className="material-symbols-outlined text-sm">{item.icon}</span>
-                                </div>
-                                <div>
-                                    <p className="text-sm font-semibold text-gray-800">{item.title}</p>
-                                    <p className="text-xs text-gray-500">{item.desc}</p>
-                                    <p className="text-[10px] text-gray-400 mt-1">{item.time}</p>
-                                </div>
-                            </div>
-                        ))}
+                        <div className="p-8 text-center text-gray-500 text-sm">
+                            No new notifications
+                        </div>
                     </div>
                     <div className="p-2 border-t border-gray-50 bg-gray-50 text-center">
                         <button onClick={() => navigate('/settings')} className="text-xs font-medium text-gray-600 hover:text-gray-900">View Settings</button>
@@ -102,11 +115,11 @@ export const Header = () => {
             className="flex items-center gap-3 pl-2 cursor-pointer group"
         >
           <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-blue-600 to-blue-400 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white group-hover:ring-blue-100 transition">
-            C
+            {(profile?.displayName || user?.displayName || user?.email || 'U')[0].toUpperCase()}
           </div>
           <div className="hidden md:block">
-            <p className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition">Chinedu Okeke</p>
-            <p className="text-xs text-gray-500">chinedu.o@example.com</p>
+            <p className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition">{profile?.displayName || user?.displayName || 'User'}</p>
+            <p className="text-xs text-gray-500">{user?.email || ''}</p>
           </div>
         </div>
       </div>

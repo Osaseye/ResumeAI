@@ -1,22 +1,101 @@
 import { DashboardLayout } from '@/layouts/DashboardLayout';
-import { Link, useNavigate } from 'react-router-dom';
-import { useState, useRef } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { useAuth } from '@/features/auth/AuthContext';
+import { resumeService } from './services/resumeService';
+import { coverLetterService } from '@/features/cover-letter/services/coverLetterService';
+import { fileParser } from '@/services/fileParser';
+import { vertexService } from '@/features/ai/services/vertexService';
+import type { Resume } from './types';
+import type { CoverLetter } from '@/features/cover-letter/types';
+import { toast } from 'sonner';
 
 export const MyResumesPage = () => {
-  const [activeTab, setActiveTab] = useState<'resumes' | 'cover-letters'>('resumes');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate();
+    const { user } = useAuth();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tabParam = searchParams.get('tab');
+    
+    const [activeTab, setActiveTab] = useState<'resumes' | 'cover-letters'>(
+        (tabParam === 'cover-letters') ? 'cover-letters' : 'resumes'
+    );
+    
+    const [resumes, setResumes] = useState<Resume[]>([]);
+    const [coverLetters, setCoverLetters] = useState<CoverLetter[]>([]);
+    const [loading, setLoading] = useState(true);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const navigate = useNavigate();
+
+    // Sync state with URL
+    useEffect(() => {
+        if (tabParam === 'cover-letters') {
+            setActiveTab('cover-letters');
+        } else {
+            setActiveTab('resumes');
+        }
+    }, [tabParam]);
+
+    const handleTabChange = (tab: 'resumes' | 'cover-letters') => {
+        setActiveTab(tab);
+        setSearchParams({ tab });
+    };
+
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!user) return;
+            setLoading(true);
+            try {
+                if (activeTab === 'resumes') {
+                    const data = await resumeService.getUserResumes(user.uid);
+                    setResumes(data);
+                } else {
+                    const data = await coverLetterService.getUserCoverLetters(user.uid);
+                    setCoverLetters(data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch documents:", error);
+                toast.error("Could not load your documents");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [user, activeTab]);
+
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      // Logic for file upload would go here
-      console.log('File selected:', file.name);
-      alert(`Simulating import of ${file.name}...`);
+    if (!file) return;
+
+    const toastId = toast.loading(`Importing ${file.name}...`);
+    
+    try {
+        const textContent = await fileParser.extractText(file);
+        
+        if (activeTab === 'resumes') {
+            toast.loading("Analyzing resume content with AI...", { id: toastId });
+            const parsedData = await vertexService.parseResume(textContent);
+            toast.dismiss(toastId);
+            toast.success("Resume parsed!");
+            navigate('/resume-builder', { state: { parsedData } });
+        } else {
+            toast.loading("Analyzing cover letter with AI...", { id: toastId });
+            const parsedData = await vertexService.parseCoverLetter(textContent);
+            toast.dismiss(toastId);
+            toast.success("Cover letter parsed!");
+            navigate('/cover-letter-builder', { state: { parsedData } });
+        }
+    } catch (error) {
+        console.error("Import failed:", error);
+        toast.error("Failed to import document. Please try again.", { id: toastId });
+    } finally {
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
     }
   };
 
@@ -52,7 +131,7 @@ export const MyResumesPage = () => {
       <div className="border-b border-gray-200 mb-6">
             <nav className="-mb-px flex space-x-8">
                 <button 
-                    onClick={() => setActiveTab('resumes')}
+                    onClick={() => handleTabChange('resumes')}
                     className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                         activeTab === 'resumes' 
                         ? 'border-black text-black' 
@@ -62,7 +141,7 @@ export const MyResumesPage = () => {
                     Resumes
                 </button>
                  <button 
-                    onClick={() => setActiveTab('cover-letters')}
+                    onClick={() => handleTabChange('cover-letters')}
                     className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                         activeTab === 'cover-letters' 
                         ? 'border-black text-black' 
@@ -84,100 +163,47 @@ export const MyResumesPage = () => {
           <p className="font-semibold text-gray-900">Create New Resume</p>
           <p className="text-sm text-gray-500 mt-1">Start from scratch or use AI</p>
         </Link>
+        
+        {loading ? (
+             <div className="col-span-1 md:col-span-2 lg:col-span-3 flex justify-center py-12">
+                 <p className="text-gray-400">Loading your resumes...</p>
+             </div>
+        ) : (
+            resumes.map(resume => (
+                <div key={resume.id} className="relative bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow flex flex-col justify-between h-[400px]">
+                    <div>
+                        <div className="flex justify-between items-start mb-4">
+                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold uppercase">ATS: 85</span>
+                            <button className="text-gray-400 hover:text-gray-600">
+                                <span className="material-symbols-outlined">more_vert</span>
+                            </button>
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-1 line-clamp-2">{resume.title || 'Untitled Resume'}</h3>
+                         <p className="text-sm text-gray-500">{new Date(resume.updatedAt).toLocaleDateString()}</p>
+                        
+                        <div className="mt-6 space-y-2">
+                             <div className="flex items-center text-sm text-gray-600">
+                                <span className="material-symbols-outlined text-sm mr-2 text-gray-400">person</span>
+                                {resume.contact.fullName || 'No Name'}
+                            </div>
+                             <div className="flex items-center text-sm text-gray-600">
+                                <span className="material-symbols-outlined text-sm mr-2 text-gray-400">work</span>
+                                {resume.experience.length} Positions
+                            </div>
+                         </div>
+                    </div>
 
-
-        {/* Existing Resume Card 1 */}
-        <div 
-            onClick={() => navigate('/resumes/1')}
-            className="group bg-white rounded-xl shadow-soft hover:shadow-card transition-all overflow-hidden flex flex-col h-[400px] cursor-pointer"
-        >
-          <div className="relative flex-1 bg-gray-100 overflow-hidden group-hover:opacity-90 transition-opacity">
-            {/* Visual representation of a resume doc */}
-            <div className="absolute top-4 left-4 right-4 bottom-0 bg-white shadow-sm rounded-t-lg p-6 transform translate-y-2 transition-transform group-hover:translate-y-0">
-                <div className="space-y-3">
-                    <div className="h-6 bg-gray-200 w-2/3 rounded"></div>
-                    <div className="h-4 bg-gray-100 w-1/2 rounded"></div>
-                    <div className="space-y-2 mt-6">
-                        <div className="h-3 bg-gray-100 w-full rounded"></div>
-                        <div className="h-3 bg-gray-100 w-full rounded"></div>
-                        <div className="h-3 bg-gray-100 w-5/6 rounded"></div>
+                    <div className="flex gap-2">
+                         <Link to={`/resumes/${resume.id}`} className="flex-1 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition flex items-center justify-center">
+                            View
+                        </Link>
+                         <button className="px-3 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
+                            <span className="material-symbols-outlined text-sm">download</span>
+                        </button>
                     </div>
                 </div>
-            </div>
-            
-            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                 <button className="bg-white p-2 rounded-full shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-colors" title="Edit">
-                    <span className="material-symbols-outlined text-[18px]">edit</span>
-                 </button>
-                 <button className="bg-white p-2 rounded-full shadow-sm hover:bg-gray-50 text-gray-600 hover:text-red-600 transition-colors" title="Delete">
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                 </button>
-            </div>
-            <div className="absolute bottom-3 left-3 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                Product Design Role
-            </div>
-          </div>
-          <div className="p-4 border-t border-gray-100">
-            <div className="flex justify-between items-start mb-1">
-                <h3 className="font-bold text-gray-900 truncate pr-2">Software Engineer Resume</h3>
-                <span className="material-symbols-outlined text-gray-400 text-[18px] cursor-pointer hover:text-gray-600">more_vert</span>
-            </div>
-            <p className="text-xs text-gray-500 mb-3">Last updated 2 days ago</p>
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
-                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                    <span>ATS: 85</span>
-                </div>
-                <button className="text-xs font-semibold hover:underline">Download PDF</button>
-            </div>
-          </div>
-        </div>
-
-        {/* Existing Resume Card 2 */}
-         <div 
-            onClick={() => navigate('/resumes/1')}
-            className="group bg-white rounded-xl shadow-soft hover:shadow-card transition-all overflow-hidden flex flex-col h-[400px] cursor-pointer"
-        >
-          <div className="relative flex-1 bg-gray-100 overflow-hidden group-hover:opacity-90 transition-opacity">
-            <div className="absolute top-4 left-4 right-4 bottom-0 bg-white shadow-sm rounded-t-lg p-6 transform translate-y-2 transition-transform group-hover:translate-y-0">
-                <div className="space-y-3">
-                    <div className="h-6 bg-gray-200 w-1/2 rounded"></div>
-                    <div className="h-4 bg-gray-100 w-3/4 rounded"></div>
-                    <div className="space-y-2 mt-6">
-                        <div className="h-3 bg-gray-100 w-full rounded"></div>
-                        <div className="h-3 bg-gray-100 w-5/6 rounded"></div>
-                    </div>
-                </div>
-            </div>
-
-            
-            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                 <button className="bg-white p-2 rounded-full shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-colors" title="Edit">
-                    <span className="material-symbols-outlined text-[18px]">edit</span>
-                 </button>
-                 <button className="bg-white p-2 rounded-full shadow-sm hover:bg-gray-50 text-gray-600 hover:text-red-600 transition-colors" title="Delete">
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                 </button>
-            </div>
-            <div className="absolute bottom-3 left-3 bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                Applying to Google
-            </div>
-          </div>
-          <div className="p-4 border-t border-gray-100">
-            <div className="flex justify-between items-start mb-1">
-                <h3 className="font-bold text-gray-900 truncate pr-2">Senior Product Manager</h3>
-                <span className="material-symbols-outlined text-gray-400 text-[18px] cursor-pointer hover:text-gray-600">more_vert</span>
-            </div>
-            <p className="text-xs text-gray-500 mb-3">Last updated 1 week ago</p>
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded font-medium">
-                    <span className="material-symbols-outlined text-[14px]">warning</span>
-                    <span>ATS: 62</span>
-                </div>
-                <button className="text-xs font-semibold hover:underline">Download PDF</button>
-            </div>
-          </div>
-        </div>
+            ))
+        )}
       </div>
        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -190,36 +216,46 @@ export const MyResumesPage = () => {
             <p className="text-sm text-gray-500 mt-1">Tailored for specific roles</p>
             </Link>
 
-            {/* Mock Cover Letter */}
-            <div 
-                onClick={() => navigate('/cover-letters/1')}
-                className="group bg-white rounded-xl shadow-soft hover:shadow-card transition-all overflow-hidden flex flex-col h-[400px] cursor-pointer"
-            >
-                <div className="relative flex-1 bg-gray-100 overflow-hidden group-hover:opacity-90 transition-opacity p-8">
-                     <div className="w-full h-full bg-white shadow-sm rounded-lg p-6 text-[4px] leading-relaxed text-gray-400 overflow-hidden">
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-                        <br/><br/>
-                        Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-                     </div>
-                     
-                     <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                        <button className="bg-white p-2 rounded-full shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-colors" title="Edit" onClick={(e) => e.stopPropagation()}>
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
-                        </button>
-                         <button className="bg-white p-2 rounded-full shadow-sm hover:bg-gray-50 text-gray-600 hover:text-red-600 transition-colors" title="Delete" onClick={(e) => e.stopPropagation()}>
-                            <span className="material-symbols-outlined text-[18px]">delete</span>
-                         </button>
+            {loading ? (
+                <div className="col-span-1 md:col-span-2 lg:col-span-3 flex justify-center py-12">
+                     <p className="text-gray-400">Loading your cover letters...</p>
+                 </div>
+            ) : (
+                coverLetters.map(letter => (
+                    <div key={letter.id} className="relative bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow flex flex-col justify-between h-[400px]">
+                        <div>
+                             <div className="flex justify-between items-start mb-4">
+                                <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-bold uppercase">Draft</span>
+                                <button className="text-gray-400 hover:text-gray-600">
+                                    <span className="material-symbols-outlined">more_vert</span>
+                                </button>
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-1 line-clamp-2">{letter.title || 'Untitled'}</h3>
+                            <p className="text-sm text-gray-500">{new Date(letter.updatedAt).toLocaleDateString()}</p>
+                            
+                             <div className="mt-6 space-y-2">
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <span className="material-symbols-outlined text-sm mr-2 text-gray-400">business</span>
+                                    {letter.company || 'No Company'}
+                                </div>
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <span className="material-symbols-outlined text-sm mr-2 text-gray-400">badge</span>
+                                    {letter.jobTitle || 'No Job Title'}
+                                </div>
+                             </div>
+                        </div>
+
+                         <div className="flex gap-2">
+                             <Link to={`/cover-letters/${letter.id}`} className="flex-1 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition flex items-center justify-center">
+                                View
+                            </Link>
+                             <button className="px-3 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
+                                <span className="material-symbols-outlined text-sm">download</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div className="p-4 border-t border-gray-100">
-                    <div className="flex justify-between items-start mb-1">
-                        <h3 className="font-bold text-gray-900 truncate pr-2">Google - PM Role</h3>
-                        <span className="material-symbols-outlined text-gray-400 text-[18px] cursor-pointer hover:text-gray-600">more_vert</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">Created 1 week ago</p>
-                     <button className="text-xs font-semibold hover:underline" onClick={(e) => e.stopPropagation()}>Download PDF</button>
-                </div>
-            </div>
+                ))
+            )}
         </div>
        )}
 

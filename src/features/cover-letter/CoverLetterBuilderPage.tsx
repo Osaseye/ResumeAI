@@ -1,24 +1,55 @@
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/features/auth/AuthContext';
+import { toast } from 'sonner';
+import { coverLetterService } from './services/coverLetterService';
+import { vertexService } from '@/features/ai/services/vertexService';
+import type { CoverLetterFormData } from './types';
 
 const steps = ['Job Details', 'Recipient', 'Intro', 'Body', 'Conclusion', 'Review'];
 
 export const CoverLetterBuilderPage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const { user } = useAuth();
     const [currentStep, setCurrentStep] = useState(0);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isSaving, setIsSaving] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
     
     // Form Data State
-    const [formData, setFormData] = useState({
-        jobTitle: '',
-        company: '',
-        jobDescription: '',
-        recipientName: '',
-        recipientRole: '',
-        intro: '',
-        body: '',
-        conclusion: ''
+    const [formData, setFormData] = useState<CoverLetterFormData>(() => {
+        if (location.state?.parsedData) {
+            const data = location.state.parsedData;
+            toast.success("Cover letter content imported!");
+            return {
+                title: data.title || 'Imported Cover Letter',
+                jobTitle: data.jobTitle || 'Target Role',
+                company: data.company || 'Target Company',
+                jobDescription: data.jobDescription || '',
+                recipientName: data.recipientName || '',
+                recipientRole: data.recipientRole || '',
+                content: {
+                    intro: data.content?.intro || '',
+                    body: data.content?.body || '',
+                    conclusion: data.content?.conclusion || ''
+                }
+            };
+        }
+        return {
+            title: 'Untitled Cover Letter',
+            jobTitle: '',
+            company: '',
+            jobDescription: '',
+            recipientName: '',
+            recipientRole: '',
+            content: {
+                intro: '',
+                body: '',
+                conclusion: ''
+            }
+        };
     });
 
     const handleChange = (field: string, value: string) => {
@@ -29,6 +60,68 @@ export const CoverLetterBuilderPage = () => {
                 delete newErrors[field];
                 return newErrors;
             });
+        }
+    };
+    
+    const updateContent = (section: 'intro' | 'body' | 'conclusion', value: string) => {
+        setFormData(prev => ({
+            ...prev,
+            content: { ...prev.content, [section]: value }
+        }));
+    };
+
+    const generateAIContent = async () => {
+        if (!formData.jobTitle || !formData.company) {
+            toast.error("Please fill in Job Title and Company first.");
+            return;
+        }
+        
+        setIsGenerating(true);
+        toast.info("Generating cover letter draft...");
+        
+        try {
+            const generated = await vertexService.generateCoverLetter(
+                formData.jobTitle, 
+                formData.company, 
+                formData.jobDescription || "No description provided."
+            );
+            
+            setFormData(prev => ({
+                ...prev,
+                content: {
+                    intro: generated.intro,
+                    body: generated.body,
+                    conclusion: generated.conclusion
+                }
+            }));
+            
+            toast.success("Draft generated! Review and edit as needed.");
+            // Advance to the Intro step if we are on Job Details (0) or Recipient (1)
+            if (currentStep < 2) setCurrentStep(2);
+            
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to generate content. Please try again.");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!user) {
+            toast.error("You must be logged in to save.");
+            return;
+        }
+        setIsSaving(true);
+        try {
+            await coverLetterService.createCoverLetter(user.uid, formData);
+            toast.success("Cover letter saved successfully!");
+            navigate('/my-resumes?tab=cover-letters'); // Navigate to the cover letters tab
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to save cover letter.");
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -42,16 +135,12 @@ export const CoverLetterBuilderPage = () => {
             if (!formData.company.trim()) newErrors.company = 'Company name is required';
         }
         
-        if (stepIndex === 1) { // Recipient
-             // Optional? Maybe warn if empty
-        }
-
         if (stepIndex === 2) { // Intro
-            if (!formData.intro.trim()) newErrors.intro = 'Introduction paragraph is required';
+            if (!formData.content.intro.trim()) newErrors.intro = 'Introduction paragraph is required';
         }
 
         if (stepIndex === 3) { // Body
-             if (!formData.body.trim()) newErrors.body = 'Body content is required';
+             if (!formData.content.body.trim()) newErrors.body = 'Body content is required';
         }
 
         if (Object.keys(newErrors).length > 0) {
@@ -164,7 +253,17 @@ export const CoverLetterBuilderPage = () => {
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" 
                                     placeholder="Paste the full job description here..."
                                 ></textarea>
-                                <p className="text-xs text-gray-500 mt-1">Our AI will analyze this to highlight relevant skills.</p>
+                                <div className="mt-2 flex justify-between items-center">
+                                     <p className="text-xs text-gray-500">Our AI will analyze this to generate a tailored letter.</p>
+                                     <button 
+                                        onClick={generateAIContent}
+                                        disabled={isGenerating || !formData.jobTitle || !formData.company}
+                                        className="text-xs flex items-center gap-1 bg-purple-50 text-purple-700 px-3 py-1.5 rounded-full font-medium hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                     >
+                                         <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                                         {isGenerating ? 'Analyzing...' : 'Auto-Generate Now'}
+                                     </button>
+                                </div>
                             </div>
                         </div>
                         )}
@@ -202,16 +301,12 @@ export const CoverLetterBuilderPage = () => {
                                 </div>
                                 <textarea 
                                     rows={8} 
-                                    value={formData.intro}
-                                    onChange={(e) => handleChange('intro', e.target.value)}
+                                    value={formData.content.intro}
+                                    onChange={(e) => updateContent('intro', e.target.value)}
                                     className={`w-full px-4 py-2 border rounded-lg focus:ring-black focus:border-black ${errors.intro ? 'border-red-500' : 'border-gray-300'}`}
-                                    placeholder="Dear Hiring Manager, I am writing to express my enthusiams for..."
+                                    placeholder="Dear Hiring Manager, I am writing to express my enthusiasm for..."
                                 ></textarea>
                                 {errors.intro && <p className="text-red-500 text-xs mt-1">{errors.intro}</p>}
-                                <button className="flex items-center gap-2 text-sm font-semibold text-purple-700 hover:text-purple-800">
-                                    <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-                                    Generate Intro with AI
-                                </button>
                             </div>
                         )}
 
@@ -223,16 +318,12 @@ export const CoverLetterBuilderPage = () => {
                                 </div>
                                 <textarea 
                                     rows={10} 
-                                    value={formData.body}
-                                    onChange={(e) => handleChange('body', e.target.value)}
+                                    value={formData.content.body}
+                                    onChange={(e) => updateContent('body', e.target.value)}
                                     className={`w-full px-4 py-2 border rounded-lg focus:ring-black focus:border-black ${errors.body ? 'border-red-500' : 'border-gray-300'}`}
                                     placeholder="In my previous role at..."
                                 ></textarea>
                                 {errors.body && <p className="text-red-500 text-xs mt-1">{errors.body}</p>}
-                                 <button className="flex items-center gap-2 text-sm font-semibold text-purple-700 hover:text-purple-800">
-                                    <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-                                    Optimize with AI
-                                </button>
                             </div>
                         )}
 
@@ -241,8 +332,8 @@ export const CoverLetterBuilderPage = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Conclusion</label>
                                 <textarea 
                                     rows={6} 
-                                    value={formData.conclusion}
-                                    onChange={(e) => handleChange('conclusion', e.target.value)}
+                                    value={formData.content.conclusion}
+                                    onChange={(e) => updateContent('conclusion', e.target.value)}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                                     placeholder="Thank you for your time and consideration. I look forward to..."
                                 ></textarea>
@@ -254,22 +345,19 @@ export const CoverLetterBuilderPage = () => {
                                 <h3 className="text-xl font-bold text-gray-900 mb-4">You're almost done!</h3>
                                 <div className="bg-gray-50 p-6 rounded-lg text-left border border-gray-200 mb-6 font-serif text-sm leading-relaxed max-h-60 overflow-y-auto">
                                     <p className="mb-4">Dear {formData.recipientName || 'Hiring Manager'},</p>
-                                    <p className="mb-4">{formData.intro}</p>
-                                    <p className="mb-4">{formData.body}</p>
-                                    <p className="mb-4">{formData.conclusion}</p>
+                                    <p className="mb-4">{formData.content.intro}</p>
+                                    <p className="mb-4 whitespace-pre-line">{formData.content.body}</p>
+                                    <p className="mb-4">{formData.content.conclusion}</p>
                                     <p>Sincerely,<br/>Your Name</p>
                                 </div>
                                 <div className="flex justify-center gap-4">
-                                     <button 
-                                        onClick={() => navigate('/cover-letters/new-id')}
-                                        className="px-6 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                     >
-                                        <span className="material-symbols-outlined">visibility</span>
-                                        View Letter & Analysis
-                                    </button>
-                                    <button className="px-6 py-3 bg-black text-white rounded-lg font-medium hover:bg-gray-800 shadow-lg shadow-gray-200 flex items-center gap-2">
-                                        <span className="material-symbols-outlined">download</span>
-                                        Save & Download PDF
+                                    <button 
+                                        onClick={handleSave}
+                                        disabled={isSaving}
+                                        className="px-6 py-3 bg-black text-white rounded-lg font-medium hover:bg-gray-800 shadow-lg shadow-gray-200 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                    >
+                                        <span className="material-symbols-outlined">save</span>
+                                        {isSaving ? 'Saving...' : 'Save & Finish'}
                                     </button>
                                 </div>
                             </div>
