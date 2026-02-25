@@ -1,73 +1,75 @@
-# React + TypeScript + Vite
+# ResumeAI 🚀
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![ResumeAI Logo](./public/icon.png)
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+**ResumeAI** is an advanced AI-powered career development platform designed to help job seekers create optimized resumes and prepare for interviews effectively. By leveraging cutting-edge AI technologies (Vertex AI), ResumeAI provides personalized feedback, ATS (Applicant Tracking System) optimization, and mock interview simulations.
 
-## React Compiler
+### Key Features ✨
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+*   **📄 Smart Resume Builder**: Create professional, ATS-friendly resumes tailored to specific job descriptions.
+*   **🔍 ATS Analyzer**: Analyze your resume against job descriptions to identify missing keywords and formatting issues, improving your chances of passing automated screenings.
+*   **🎯 Interview Prep**: Practice with AI-driven mock interviews that provide real-time feedback on your answers, tone, and delivery.
+*   **💡 Personalized Feedback**: Get detailed insights and actionable advice to improve your resume content and interview performance.
+*   **🔒 Secure Authentication**: Manage your profile and saved resumes securely with Firebase Authentication.
+*   **📱 Responsive Dashboard**: A modern, user-friendly interface built with React and Tailwind CSS.
 
-## Expanding the ESLint configuration
+## Tech Stack 🛠️
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+*   **Frontend**: React 19, TypeScript, Vite
+*   **Styling**: Tailwind CSS, Radix UI, Lucide Icons
+*   **State Management**: React Query, Context API
+*   **Form Handling**: React Hook Form, Zod
+*   **AI Integration**: Vertex AI (Google Cloud)
+*   **Auth & Backend**: Firebase
+*   **File Parsing**: PDF.js, Mammoth (for parsing docx)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Getting Started 🚀
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Follow these steps to set up the project locally:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Prerequisites
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+*   Node.js (v18 or higher recommended)
+*   npm or yarn
+*   A Firebase project with Authentication enabled
+*   Google Cloud Project with Vertex AI API enabled
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Installation
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/resumeai.git
+    cd resumeai
+    ```
+
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+
+3.  **Environment Setup:**
+    Create a `.env` file in the root directory and add your Firebase and AI API keys:
+    ```env
+    VITE_FIREBASE_API_KEY=your_api_key
+    VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
+    VITE_FIREBASE_PROJECT_ID=your_project_id
+    # ... other required env vars
+    ```
+
+4.  **Run the development server:**
+    ```bash
+    npm run dev
+    ```
+
+## Scripts 📜
+
+*   `npm run dev`: Start the development server.
+*   `npm run build`: Build the app for production (TypeScript compiled).
+*   `npm run lint`: Run ESLint to catch code quality issues.
+*   `npm run preview`: Preview the production build locally.
+
+---
+
+Built with ❤️ by the ResumeAI Team.
