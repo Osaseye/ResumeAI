@@ -23,7 +23,6 @@ export const JobMatchesPage = () => {
       const saved = localStorage.getItem('saved_jobs_data');
       return saved ? JSON.parse(saved) : [];
   });
-  const [userRole, setUserRole] = useState("Software Engineer");
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -37,7 +36,6 @@ export const JobMatchesPage = () => {
                     const data = docSnap.data() as UserProfile;
                     if (data.role) {
                         role = data.role;
-                        setUserRole(role);
                     }
                 }
             }

@@ -135,27 +135,30 @@ export const ResumeDetailsPage = () => {
 
     return (
         <DashboardLayout>
-            <div className="flex flex-col h-[calc(100vh-100px)]">
+            <div className="flex flex-col lg:h-[calc(100vh-100px)]">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                        <Link to="/my-resumes" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between mb-6 gap-4">
+                    <div className="flex items-start md:items-center gap-4">
+                        <Link to="/my-resumes" className="p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0">
                             <span className="material-symbols-outlined text-gray-500">arrow_back</span>
                         </Link>
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">{resume.title}</h1>
-                            <p className="text-sm text-gray-500">Last edited {new Date(resume.updatedAt).toLocaleDateString()}</p>
+                        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+                            <div>
+                                <h1 className="text-xl md:text-2xl font-bold text-gray-900 line-clamp-1">{resume.title}</h1>
+                                <p className="text-sm text-gray-500">Last edited {new Date(resume.updatedAt).toLocaleDateString()}</p>
+                            </div>
+                            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-200 w-fit">
+                                ATS Score: 85
+                            </span>
                         </div>
-                        <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
-                            ATS Score: 85
-                        </span>
                     </div>
-                    <div className="flex gap-3">
+                    
+                    <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                         <select 
                             value={resume.template || 'professional'} 
                             onChange={(e) => handleTemplateChange(e.target.value as any)}
                             disabled={isUpdatingTemplate}
-                            className="px-3 py-2 border border-blue-500 rounded-lg text-blue-800 font-medium bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer hover:bg-blue-100 transition-colors"
+                            className="w-full md:w-auto px-3 py-2 border border-blue-500 rounded-lg text-blue-800 font-medium bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer hover:bg-blue-100 transition-colors"
                         >
                             <option value="professional">Professional</option>
                             <option value="modern">Modern</option>
@@ -163,26 +166,30 @@ export const ResumeDetailsPage = () => {
                             <option value="simple">Simple</option>
                             <option value="tech">Tech</option>
                         </select>
-                        <button className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50 flex items-center gap-2">
-                             <span className="material-symbols-outlined text-sm">download</span>
-                            Download PDF
-                        </button>
-                         <button className="px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 flex items-center gap-2 shadow-lg shadow-gray-200">
-                             <span className="material-symbols-outlined text-sm">edit</span>
-                            Edit Resume
-                        </button>
+                        <div className="flex gap-3">
+                            <button className="flex-1 md:flex-none justify-center px-4 py-2 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50 flex items-center gap-2 text-sm whitespace-nowrap">
+                                <span className="material-symbols-outlined text-sm">download</span>
+                                Download PDF
+                            </button>
+                            <button className="flex-1 md:flex-none justify-center px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 flex items-center gap-2 shadow-lg shadow-gray-200 text-sm whitespace-nowrap">
+                                <span className="material-symbols-outlined text-sm">edit</span>
+                                Edit
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full overflow-hidden">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full lg:overflow-hidden">
                     {/* Left: Resume Preview (Scrollable) */}
-                    <div className="lg:col-span-2 bg-gray-100 rounded-2xl p-8 overflow-y-auto border border-gray-200 shadow-inner">
-                         <div className="flex justify-center min-h-[1000px]">
-                            <ResumePreview data={resume} template={resume.template || 'professional'} />
+                    <div className="lg:col-span-2 bg-gray-100 rounded-2xl p-4 md:p-8 overflow-y-auto border border-gray-200 shadow-inner min-h-[500px]">
+                         <div className="flex justify-center w-full">
+                            <div className="transform scale-[0.4] sm:scale-[0.5] md:scale-[0.65] lg:scale-[0.7] xl:scale-[0.8] origin-top">
+                                <ResumePreview data={resume} template={resume.template || 'professional'} />
+                            </div>
                         </div>
                     </div>
                     {/* Right: Insights & Jobs (Scrollable) */}
-                    <div className="lg:col-span-1 space-y-6 overflow-y-auto pr-2">
+                    <div className="lg:col-span-1 space-y-6 lg:overflow-y-auto pr-2 pb-10 lg:pb-0">
                         {/* AI Insights Card */}
                         <div className="bg-white rounded-xl shadow-soft p-6 border border-gray-100">
                             <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
