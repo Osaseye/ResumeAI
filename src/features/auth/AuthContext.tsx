@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut as firebaseSignOut, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 
@@ -17,12 +17,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
+    let unsubscribe: (() => void) | undefined;
 
-    return () => unsubscribe();
+    const initializeAuth = async () => {
+        try {
+            // Configure to use Session persistence (per tab)
+            // This allows multiple users to be logged in on different tabs
+            await setPersistence(auth, browserSessionPersistence);
+        } catch (error) {
+            console.error("Error setting auth persistence:", error);
+        }
+
+        unsubscribe = onAuthStateChanged(auth, (user) => {
+            setUser(user);
+            setLoading(false);
+        });
+    };
+
+    initializeAuth();
+    
+    return () => {
+        if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const logout = async () => {
