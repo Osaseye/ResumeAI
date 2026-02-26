@@ -26,6 +26,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const logout = async () => {
+    // Clear potentially leaky local storage keys on explicit logout
+    localStorage.removeItem('dashboard_stats_cache');
+    localStorage.removeItem('dashboard_profile_cache');
+    localStorage.removeItem('dashboard_jobs_cache');
+    localStorage.removeItem('interview_stats');
+    localStorage.removeItem('saved_jobs_data'); 
+    localStorage.removeItem('onboarding_data');
+    
     await firebaseSignOut(auth);
   };
 

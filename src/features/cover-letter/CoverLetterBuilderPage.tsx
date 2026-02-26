@@ -169,26 +169,26 @@ export const CoverLetterBuilderPage = () => {
 
     return (
         <DashboardLayout>
-             <div className="max-w-4xl mx-auto h-full flex flex-col">
+             <div className="max-w-4xl mx-auto min-h-screen flex flex-col pb-20">
                 {/* Header with Back Button */}
-                <div className="mb-8 pt-8 relative">
+                <div className="mb-6 pt-6 relative px-4 md:px-0">
                     <button 
-                        onClick={() => navigate('/my-resumes')}
-                        className="absolute left-0 top-8 flex items-center text-gray-500 hover:text-gray-900 transition-colors"
+                        onClick={() => navigate('/my-resumes?tab=cover-letters')}
+                        className="mb-4 md:mb-0 md:absolute md:left-0 md:top-8 flex items-center text-gray-500 hover:text-gray-900 transition-colors"
                     >
                         <span className="material-symbols-outlined mr-1">arrow_back</span>
-                        Back
+                        Back <span className="hidden md:inline">to Documents</span>
                     </button>
                     <div className="text-center">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">Craft a Persuasive Cover Letter</h1>
-                        <p className="text-gray-500">Tailor your story to the job you want.</p>
+                        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Build Your Cover Letter</h1>
+                        <p className="text-sm md:text-base text-gray-500">Tailor your story to the job you want.</p>
                     </div>
                 </div>
 
-                <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col md:flex-row mb-12">
+                <div className="flex-1 bg-white md:rounded-2xl shadow-sm md:border border-gray-200 overflow-hidden flex flex-col md:flex-row mb-12">
                     {/* Stepper / Sidebar */}
-                    <div className="w-full md:w-64 bg-gray-50 border-r border-gray-200 p-6 flex flex-col">
-                        <div className="space-y-1">
+                    <div className="w-full md:w-64 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-200 p-4 md:p-6 flex flex-col">
+                        <div className="flex flex-row md:flex-col overflow-x-auto space-x-4 md:space-x-0 md:space-y-1 pb-2 md:pb-0 no-scrollbar">
                             {steps.map((step, index) => (
                                 <div 
                                     key={step} 
@@ -197,32 +197,33 @@ export const CoverLetterBuilderPage = () => {
                                             setCurrentStep(index);
                                         }
                                     }}
-                                    className={`flex items-center p-2 rounded-lg cursor-pointer ${
+                                    className={`flex items-center flex-shrink-0 p-2 rounded-lg cursor-pointer transition-colors ${
                                         index === currentStep 
                                         ? 'bg-white shadow-sm border border-gray-200' 
                                         : 'text-gray-500 hover:bg-gray-100'
                                     }`}
                                 >
-                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium mr-3 ${
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium mr-2 md:mr-3 ${
                                         index === currentStep ? 'bg-black text-white' : 'bg-gray-200 text-gray-600'
                                     }`}>
                                         {index + 1}
                                     </div>
-                                    <span className={`text-sm font-medium ${index === currentStep ? 'text-gray-900' : ''}`}>{step}</span>
+                                    <span className={`text-sm font-medium whitespace-nowrap ${index === currentStep ? 'text-gray-900' : ''}`}>{step}</span>
                                 </div>
                             ))}
                         </div>
                     </div>
 
                     {/* Form Area */}
-                    <div className="flex-1 p-8 overflow-y-auto max-h-[600px]">
+                    <div className="flex-1 p-4 md:p-8 overflow-y-auto md:max-h-[600px] h-full">
                         <div className="mb-6 flex justify-between items-center">
                             <h2 className="text-xl font-bold text-gray-900">{steps[currentStep]}</h2>
-                            <span className="text-sm text-gray-400">Step {currentStep + 1} of {steps.length}</span>
+                            <span className="text-sm text-gray-400 hidden md:inline">Step {currentStep + 1} of {steps.length}</span>
+                            <span className="text-xs text-gray-400 md:hidden">{currentStep + 1}/{steps.length}</span>
                         </div>
 
                          {currentStep === 0 && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                        <div className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Job Title <span className="text-red-500">*</span></label>
                                 <input 
@@ -372,8 +373,10 @@ export const CoverLetterBuilderPage = () => {
                                 
                                 <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50 p-4">
                                      <h3 className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wider">Live Preview</h3>
-                                     <div className="transform scale-[0.6] origin-top h-[600px] overflow-y-auto border border-gray-300 shadow-lg">
-                                        <CoverLetterPreview data={formData} template={selectedTemplate} />
+                                     <div className="w-full flex justify-center overflow-hidden">
+                                        <div className="transform scale-[0.4] sm:scale-[0.5] md:scale-[0.6] origin-top h-[500px] md:h-[600px] overflow-y-auto border border-gray-300 shadow-lg bg-white">
+                                            <CoverLetterPreview data={formData} template={selectedTemplate} />
+                                        </div>
                                      </div>
                                 </div>
                             </div>

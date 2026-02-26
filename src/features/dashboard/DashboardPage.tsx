@@ -87,14 +87,17 @@ export const DashboardPage = () => {
                     // Only fetch if we don't have it or want to refresh (here we always refresh in background)
                     const docRef = doc(db, 'users', user.uid);
                     const docSnap = await getDoc(docRef);
+                    let userProfileData: UserProfile | null = null;
                     if (docSnap.exists()) {
-                        const data = docSnap.data() as UserProfile;
-                        setProfile(data);
-                        localStorage.setItem('dashboard_profile_cache', JSON.stringify(data));
+                        userProfileData = docSnap.data() as UserProfile;
+                        setProfile(userProfileData);
+                        localStorage.setItem('dashboard_profile_cache', JSON.stringify(userProfileData));
                     }
 
-                    // 2. Fetch Jobs (Simulating Backend)
-                    const jobs = await jobsService.searchJobs("Software Engineer", "Nigeria");
+                    // 2. Fetch Jobs based on User Profile
+                    const searchRole = userProfileData?.role || profile?.role || "Software Engineer";
+                    const jobs = await jobsService.searchJobs(searchRole, "Nigeria");
+                    
                     // Only update if data changed (simple length check or deep comparison could be better)
                     if (JSON.stringify(jobs.slice(0, 5)) !== JSON.stringify(recentJobs)) {
                         setRecentJobs(jobs.slice(0, 5));
@@ -115,11 +118,33 @@ export const DashboardPage = () => {
 
                     // 4. Stats Calculation
                     const statsStr = localStorage.getItem('interview_stats');
+
+                    // Calculate average health of resumes
+                    let totalHealth = 0;
+                    if (resumes.length > 0) {
+                        resumes.forEach(resume => {
+                            let score = 0;
+                            // Basic completeness check
+                            if (resume.contact?.email) score += 10;
+                            if (resume.contact?.phone) score += 10;
+                            if (resume.contact?.linkedin) score += 10;
+                            if (resume.summary?.length > 50) score += 20;
+                            if (resume.experience?.length > 0) score += 20;
+                            if (resume.education?.length > 0) score += 10;
+                            if (resume.skills?.length > 0) score += 20;
+                            
+                            // Cap at 100
+                            totalHealth += Math.min(100, score);
+                        });
+                        totalHealth = Math.round(totalHealth / resumes.length);
+                    }
+                    
                     let newStats = {
-                        resumeHealth: stats.resumeHealth || 78,
-                        atsScore: stats.atsScore || 65,
+                        resumeHealth: totalHealth,
+                        // ATS Score is usually stricter, let's assume it's slightly lower than health unless optimized
+                        atsScore: totalHealth > 0 ? Math.max(0, totalHealth - 15) : 0,
                         jobMatches: jobs.length,
-                        pendingReviews: stats.pendingReviews || 1
+                        pendingReviews: resumes.length // treating all resumes as potentially reviewable
                     };
 
                     let interviewCount = 0;
@@ -173,8 +198,11 @@ export const DashboardPage = () => {
                     const savedJobsStr = localStorage.getItem('saved_jobs_data');
                     if (savedJobsStr) {
                         try {
-                            const savedJobs = JSON.parse(savedJobsStr);
-                            newStats.jobMatches = savedJobs.length;
+                           // Keep previous logic or update?
+                           // The user complained about fresh metrics.
+                           // If new user, saved jobs is 0.
+                           // jobMatches should reflect available jobs for their role, not saved jobs.
+                           // So we remove the overwrite.
                         } catch (e) { console.error("Error parsing saved jobs", e); }
                     }
 

@@ -4,9 +4,17 @@ import { useNavigate } from 'react-router-dom';
 import { jobsService } from '@/features/jobs/services/jobService';
 import type { Job } from '@/features/jobs/services/jobService';
 import { toast } from 'sonner';
+import { useAuth } from '@/features/auth/AuthContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
+interface UserProfile {
+  role: string;
+}
 
 export const JobMatchesPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [view, setView] = useState<'matches' | 'saved'>('matches');
   const [showPreferences, setShowPreferences] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -15,12 +23,26 @@ export const JobMatchesPage = () => {
       const saved = localStorage.getItem('saved_jobs_data');
       return saved ? JSON.parse(saved) : [];
   });
+  const [userRole, setUserRole] = useState("Software Engineer");
 
   useEffect(() => {
     const fetchJobs = async () => {
         setLoading(true);
         try {
-            const data = await jobsService.searchJobs('Software Engineer', 'Nigeria');
+            let role = "Software Engineer";
+            if (user?.uid) {
+                const docRef = doc(db, 'users', user.uid);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data() as UserProfile;
+                    if (data.role) {
+                        role = data.role;
+                        setUserRole(role);
+                    }
+                }
+            }
+            
+            const data = await jobsService.searchJobs(role, 'Nigeria');
             setJobs(data);
         } catch (error) {
             console.error(error);
@@ -30,7 +52,7 @@ export const JobMatchesPage = () => {
         }
     };
     fetchJobs();
-  }, []);
+  }, [user]);
   
   const handleSaveJob = (job: Job) => {
       setSavedJobs(prev => {

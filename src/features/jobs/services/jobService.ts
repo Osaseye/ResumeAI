@@ -100,6 +100,20 @@ const MOCK_JOBS: Job[] = [
 
 export const jobsService = {
     async searchJobs(query: string, location: string = 'Nigeria'): Promise<Job[]> {
+        // Cache Key based on query parameters
+        const cacheKey = `job_search_${query}_${location}`;
+        const cached = localStorage.getItem(cacheKey);
+        
+        // Return cached data if valid (less than 24 hours old)
+        if (cached) {
+            const { timestamp, jobs } = JSON.parse(cached);
+            const oneDay = 24 * 60 * 60 * 1000;
+            if (Date.now() - timestamp < oneDay) {
+                console.log(`Serving cached jobs for ${query} in ${location}`);
+                return jobs;
+            }
+        }
+
         console.log(`Searching for ${query} in ${location}...`);
         
         const apiKey = import.meta.env.VITE_RAPIDAPI_KEY;
@@ -126,16 +140,22 @@ export const jobsService = {
                      console.warn("RapidAPI Rate Limit Exceeded. Returning mock data.");
                      return MOCK_JOBS;
                 }
+                if (response.status === 403) {
+                     console.warn("RapidAPI Forbidden. Invalid Key. Returning mock data.");
+                     // Maybe clear invalid key usage?
+                     return MOCK_JOBS;
+                }
                 throw new Error(`RapidAPI Error: ${response.status} ${response.statusText}`);
             }
 
             const data = await response.json();
             
-            if (!data.data || !Array.isArray(data.data)) {
-                 return [];
+            if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+                 console.warn("No jobs found from API. Returning mock data as fallback.");
+                 return MOCK_JOBS;
             }
 
-            return data.data.map((item: any) => ({
+            const jobs = data.data.map((item: any) => ({
                 job_id: item.job_id,
                 employer_name: item.employer_name,
                 employer_logo: item.employer_logo,
@@ -149,12 +169,21 @@ export const jobsService = {
                 job_min_salary: item.job_min_salary,
                 job_max_salary: item.job_max_salary,
                 job_salary_currency: item.job_salary_currency,
-                match_score: Math.floor(Math.random() * 20) + 70 // Simulate a base match score for now
+                match_score: Math.floor(Math.random() * 20 + 80) // Mock score since API doesn't provide it
             }));
 
+            // Cache the successful result
+            localStorage.setItem(cacheKey, JSON.stringify({
+                timestamp: Date.now(),
+                jobs: jobs
+            }));
+
+            return jobs;
+
         } catch (error) {
-            console.error("Error fetching jobs from JSearch:", error);
-            // Fallback to mock data on error so the UI doesn't break
+            console.error("Error searching jobs:", error);
+            // Fallback to cache if request fails, even if expired? 
+            // For now, let's just return mock data on error as before
             return MOCK_JOBS;
         }
     },

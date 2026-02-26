@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
+import { useAuth } from '@/features/auth/AuthContext';
 
 const SETTINGS_MENU = [
     { title: 'Account', desc: 'Profile details & password', icon: 'person', path: '/settings/account' },
@@ -10,6 +11,16 @@ const SETTINGS_MENU = [
 
 export const SettingsPage = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
+  
+  const handleLogout = async () => {
+    try {
+        await logout();
+        navigate('/login');
+    } catch (error) {
+        console.error("Logout failed", error);
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -22,9 +33,7 @@ export const SettingsPage = () => {
                 <button 
                     key={item.title}
                     onClick={() => navigate(item.path)}
-                    className={`w-full flex items-center justify-between p-6 hover:bg-gray-50 transition text-left group ${
-                        item.title === 'Help Center' ? 'md:hidden' : ''
-                    }`}
+                    className={`w-full flex items-center justify-between p-6 hover:bg-gray-50 transition text-left group`}
                 >
                     <div className="flex items-center gap-4">
                         <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition">
@@ -40,7 +49,10 @@ export const SettingsPage = () => {
         </div>
 
         <div>
-             <button className="w-full p-4 text-red-600 font-medium bg-red-50 hover:bg-red-100 rounded-xl transition flex items-center justify-center gap-2">
+             <button 
+                onClick={handleLogout}
+                className="w-full p-4 text-red-600 font-medium bg-red-50 hover:bg-red-100 rounded-xl transition flex items-center justify-center gap-2"
+             >
                 <span className="material-symbols-outlined">logout</span>
                 Sign Out
             </button>
