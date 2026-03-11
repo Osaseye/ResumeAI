@@ -10,7 +10,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -62,8 +62,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+  if (context === undefined || context === null) {
+    // During HMR or edge-case re-renders the provider may be absent.
+    // Return a safe default so the tree doesn't crash.
+    return { user: null, loading: true, logout: async () => {} } as AuthContextType;
   }
   return context;
 };

@@ -1,5 +1,6 @@
-// SerpApi (Google Jobs engine) via Vercel serverless proxy.
+// Remotive remote-jobs API (free, no key, CORS-friendly).
 // Per-device daily rate limiting. Cached per-query for 24 hours.
+// Filters for jobs open to Nigerian / Worldwide applicants.
 
 export interface Job {
     job_id: string;
@@ -20,180 +21,206 @@ export interface Job {
 
 const DEVICE_CALL_KEY = 'device_job_api_date';
 const PRIMARY_JOBS_KEY = 'primary_jobs_cache';
+const REMOTIVE_BASE = 'https://remotive.com/api/remote-jobs';
 
-/** Returns today's date as YYYY-MM-DD string for comparison */
+/** Map common role keywords to Remotive category slugs */
+const ROLE_CATEGORY_MAP: Record<string, string> = {
+    'software': 'software-dev',
+    'developer': 'software-dev',
+    'engineer': 'software-dev',
+    'frontend': 'software-dev',
+    'backend': 'software-dev',
+    'fullstack': 'software-dev',
+    'full-stack': 'software-dev',
+    'web': 'software-dev',
+    'mobile': 'software-dev',
+    'devops': 'devops-sysadmin',
+    'sysadmin': 'devops-sysadmin',
+    'cloud': 'devops-sysadmin',
+    'data': 'data',
+    'analyst': 'data',
+    'machine learning': 'data',
+    'ai': 'data',
+    'design': 'design',
+    'ui': 'design',
+    'ux': 'design',
+    'product': 'product',
+    'project': 'project-management',
+    'manager': 'project-management',
+    'marketing': 'marketing',
+    'sales': 'sales',
+    'customer': 'customer-service',
+    'support': 'customer-service',
+    'qa': 'qa',
+    'test': 'qa',
+    'writing': 'writing',
+    'content': 'writing',
+    'copywriter': 'writing',
+    'finance': 'finance-legal',
+    'accounting': 'finance-legal',
+    'legal': 'finance-legal',
+    'human resources': 'hr',
+    'hr': 'hr',
+    'recruiter': 'hr',
+};
+
+/** Convert a user role string to the best Remotive category slug */
+function roleToCategory(role: string): string {
+    const lower = role.toLowerCase();
+    for (const [keyword, cat] of Object.entries(ROLE_CATEGORY_MAP)) {
+        if (lower.includes(keyword)) return cat;
+    }
+    return 'software-dev';
+}
+
+/** Check if a job's location allows Nigerian applicants */
+const ELIGIBLE_PATTERNS = /worldwide|anywhere|global|africa|nigeria|remote|emea/i;
+const RESTRICTED_PATTERNS = /\b(only|US only|USA only|EU only|UK only|Europe only|Canada only|LATAM only)\b/i;
+
+function isNigeriaEligible(location: string, title: string): boolean {
+    const text = `${location} ${title}`;
+    if (RESTRICTED_PATTERNS.test(text)) return false;
+    if (ELIGIBLE_PATTERNS.test(location)) return true;
+    // If location is empty or generic, consider it eligible
+    if (!location || location.trim() === '') return true;
+    return false;
+}
+
 function getTodayDateString(): string {
     return new Date().toISOString().slice(0, 10);
 }
 
-/** Check whether this device has already made an API call today */
 function hasDeviceCalledToday(): boolean {
-    const lastCallDate = localStorage.getItem(DEVICE_CALL_KEY);
-    return lastCallDate === getTodayDateString();
+    return localStorage.getItem(DEVICE_CALL_KEY) === getTodayDateString();
 }
 
-/** Record that this device made an API call today */
 function recordDeviceCall(): void {
     localStorage.setItem(DEVICE_CALL_KEY, getTodayDateString());
 }
 
-/** Try to find cached results for a specific query (valid for 24h) */
 function getCachedJobs(cacheKey: string): Job[] | null {
     const cached = localStorage.getItem(cacheKey);
     if (!cached) return null;
-
     try {
         const { timestamp, jobs } = JSON.parse(cached);
-        const oneDay = 24 * 60 * 60 * 1000;
-        if (Date.now() - timestamp < oneDay) {
-            return jobs;
-        }
+        if (Date.now() - timestamp < 86_400_000) return jobs;
     } catch {
         localStorage.removeItem(cacheKey);
     }
     return null;
 }
 
-/** Search all query caches and return the most recent valid results */
 function getAnyCachedJobs(): Job[] | null {
     const prefix = 'job_search_';
-    const oneDay = 24 * 60 * 60 * 1000;
     let best: { jobs: Job[]; timestamp: number } | null = null;
 
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (!key || !key.startsWith(prefix)) continue;
-
         try {
             const parsed = JSON.parse(localStorage.getItem(key)!);
             if (
                 parsed?.jobs?.length &&
-                Date.now() - parsed.timestamp < oneDay &&
+                Date.now() - parsed.timestamp < 86_400_000 &&
                 (!best || parsed.timestamp > best.timestamp)
             ) {
                 best = parsed;
             }
-        } catch {
-            // Ignore malformed cache entries
-        }
+        } catch { /* skip */ }
     }
-
     return best?.jobs ?? null;
 }
 
-/** Map a SerpApi Google Jobs result item to our Job interface */
-function mapSerpApiItem(item: any, index: number): Job {
-    const extensions = item.detected_extensions || {};
-    const applyLink = item.apply_options?.[0]?.link
-        || item.share_link
-        || item.related_links?.[0]?.link
-        || '';
+/** Parse salary string like "$48k - $60k" or "$50-$75 /hour" */
+function parseSalary(salary: string | undefined): { min?: number; max?: number; currency?: string } {
+    if (!salary) return {};
+    const currency = salary.startsWith('€') ? 'EUR'
+        : salary.startsWith('£') ? 'GBP'
+        : salary.startsWith('₦') ? 'NGN'
+        : 'USD';
+    const nums = salary.replace(/,/g, '').match(/[\d.]+/g);
+    if (!nums) return { currency };
+    const isK = /k/i.test(salary);
+    let min = parseFloat(nums[0]);
+    let max = nums.length > 1 ? parseFloat(nums[1]) : undefined;
+    if (isK) { min *= 1000; if (max) max *= 1000; }
+    return { min, max, currency };
+}
 
-    // Parse salary from extensions
-    let minSalary: number | undefined;
-    let maxSalary: number | undefined;
-    let currency: string | undefined;
-
-    if (extensions.salary) {
-        const salaryStr: string = extensions.salary;
-        const nums = salaryStr.replace(/,/g, '').match(/[\d.]+/g);
-        if (nums && nums.length >= 2) {
-            minSalary = parseFloat(nums[0]);
-            maxSalary = parseFloat(nums[1]);
-            if (salaryStr.toLowerCase().includes('k')) {
-                minSalary *= 1000;
-                maxSalary *= 1000;
-            }
-        } else if (nums && nums.length === 1) {
-            minSalary = parseFloat(nums[0]);
-            if (salaryStr.toLowerCase().includes('k')) minSalary *= 1000;
-        }
-        currency = salaryStr.startsWith('₦') ? 'NGN'
-            : salaryStr.startsWith('$') ? 'USD'
-            : salaryStr.startsWith('€') ? 'EUR'
-            : salaryStr.startsWith('£') ? 'GBP'
-            : undefined;
-    }
-
-    const location = item.location || '';
-    const isRemote = /remote/i.test(location)
-        || /remote/i.test(extensions.schedule_type || '')
-        || /remote/i.test(item.title || '');
-
-    const locParts = location.split(',').map((s: string) => s.trim());
-    const city = locParts[0] || '';
-    const country = locParts[1] || (location.toLowerCase().includes('nigeria') ? 'Nigeria' : '');
+/** Map a Remotive job to our Job interface */
+function mapRemotiveItem(item: any): Job {
+    const loc = item.candidate_required_location || 'Worldwide';
+    const sal = parseSalary(item.salary);
 
     return {
-        job_id: item.job_id || `serp_${index}_${Date.now()}`,
+        job_id: `remotive_${item.id}`,
         employer_name: item.company_name || 'Unknown Company',
-        employer_logo: item.thumbnail || undefined,
+        employer_logo: item.company_logo_url || item.company_logo || undefined,
         job_title: item.title || 'Untitled Position',
-        job_city: city,
-        job_country: country,
-        job_is_remote: isRemote,
-        job_posted_at_timestamp: extensions.posted_at
-            ? Date.now() - parseSerpApiAge(extensions.posted_at)
+        job_city: '',
+        job_country: loc,
+        job_is_remote: true,
+        job_posted_at_timestamp: item.publication_date
+            ? new Date(item.publication_date).getTime()
             : Date.now(),
-        job_description: item.description || '',
-        job_apply_link: applyLink,
-        job_min_salary: minSalary,
-        job_max_salary: maxSalary,
-        job_salary_currency: currency,
+        job_description: stripHtml(item.description || ''),
+        job_apply_link: item.url || '',
+        job_min_salary: sal.min,
+        job_max_salary: sal.max,
+        job_salary_currency: sal.currency,
         match_score: Math.floor(Math.random() * 20 + 80),
     };
 }
 
-/** Convert SerpApi age strings like "3 days ago" to milliseconds */
-function parseSerpApiAge(ageStr: string): number {
-    const num = parseInt(ageStr) || 1;
-    if (/hour/i.test(ageStr)) return num * 60 * 60 * 1000;
-    if (/day/i.test(ageStr)) return num * 24 * 60 * 60 * 1000;
-    if (/week/i.test(ageStr)) return num * 7 * 24 * 60 * 60 * 1000;
-    if (/month/i.test(ageStr)) return num * 30 * 24 * 60 * 60 * 1000;
-    return 24 * 60 * 60 * 1000;
+/** Strip HTML tags to plain text for descriptions */
+function stripHtml(html: string): string {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent?.trim() || '';
 }
 
 export const jobsService = {
-    async searchJobs(query: string, location: string = 'Nigeria'): Promise<Job[]> {
-        const cacheKey = `job_search_${query}_${location}`;
+    async searchJobs(query: string, _location: string = 'Nigeria'): Promise<Job[]> {
+        const category = roleToCategory(query);
+        const cacheKey = `job_search_${category}`;
 
-        // 1. Return cached results if still valid
         const cached = getCachedJobs(cacheKey);
         if (cached) {
-            console.log(`Serving cached jobs for "${query}" in ${location}`);
+            console.log(`Serving cached jobs for "${category}"`);
             return cached;
         }
 
-        // 2. Check per-device daily limit
         if (hasDeviceCalledToday()) {
             console.log('Device API call already used today. Returning cached results.');
             return getAnyCachedJobs() ?? [];
         }
 
-        // 3. Call our Vercel serverless proxy (avoids CORS, keeps key server-side)
-        console.log(`Fetching jobs for "${query}" in ${location} via proxy...`);
-
-        const params = new URLSearchParams({
-            q: `${query} in ${location}`,
-        });
+        console.log(`Fetching remote jobs (category: ${category}) from Remotive...`);
 
         try {
-            const response = await fetch(`/api/jobs?${params.toString()}`);
+            // Fetch more than needed so we can filter for Nigeria-eligible roles
+            const url = `${REMOTIVE_BASE}?category=${category}&limit=50`;
+            const response = await fetch(url);
 
             if (!response.ok) {
-                throw new Error(`Job API Error: ${response.status} ${response.statusText}`);
+                throw new Error(`Remotive API Error: ${response.status}`);
             }
 
             const data = await response.json();
 
-            if (!data.jobs_results || !Array.isArray(data.jobs_results) || data.jobs_results.length === 0) {
-                console.warn('No jobs found for this query.');
+            if (!data.jobs?.length) {
+                console.warn('No jobs found for this category.');
                 recordDeviceCall();
                 return [];
             }
 
-            const jobs: Job[] = data.jobs_results.slice(0, 10).map(mapSerpApiItem);
+            // Filter for Nigeria-eligible and take up to 10
+            const eligible = data.jobs.filter((j: any) =>
+                isNigeriaEligible(j.candidate_required_location || '', j.title || '')
+            );
+
+            const jobs: Job[] = (eligible.length > 0 ? eligible : data.jobs)
+                .slice(0, 10)
+                .map(mapRemotiveItem);
 
             localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), jobs }));
             recordDeviceCall();
@@ -205,10 +232,6 @@ export const jobsService = {
         }
     },
 
-    /**
-     * Called once at onboarding. Makes the device's daily API call,
-     * stores ~10 jobs as the primary set that feeds the entire app.
-     */
     async fetchAndStoreJobs(role: string, location: string = 'Nigeria'): Promise<Job[]> {
         const jobs = await this.searchJobs(role, location);
         if (jobs.length > 0) {
@@ -220,20 +243,12 @@ export const jobsService = {
         return jobs;
     },
 
-    /**
-     * Read-only access to the primary job set. No API call.
-     * Used by Dashboard, Resume Details, Job Board, etc.
-     */
     getStoredJobs(): Job[] {
         const raw = localStorage.getItem(PRIMARY_JOBS_KEY);
         if (!raw) return getAnyCachedJobs() ?? [];
-
         try {
             const { timestamp, jobs } = JSON.parse(raw);
-            const oneDay = 24 * 60 * 60 * 1000;
-            if (Date.now() - timestamp < oneDay && jobs?.length) {
-                return jobs;
-            }
+            if (Date.now() - timestamp < 86_400_000 && jobs?.length) return jobs;
         } catch {
             localStorage.removeItem(PRIMARY_JOBS_KEY);
         }
@@ -241,26 +256,30 @@ export const jobsService = {
     },
 
     async getJobDetails(jobId: string): Promise<Job | null> {
-        // SerpApi Google Jobs doesn't have a dedicated job-details endpoint,
-        // so we look up from cached search results only.
         return findJobInCache(jobId);
     },
 };
 
-/** Search all cached query results for a specific job by ID */
 function findJobInCache(jobId: string): Job | null {
+    // Check primary cache first
+    const raw = localStorage.getItem(PRIMARY_JOBS_KEY);
+    if (raw) {
+        try {
+            const { jobs } = JSON.parse(raw);
+            const found = jobs?.find((j: Job) => j.job_id === jobId);
+            if (found) return found;
+        } catch { /* skip */ }
+    }
+    // Check query caches
     const prefix = 'job_search_';
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (!key || !key.startsWith(prefix)) continue;
-
         try {
             const { jobs } = JSON.parse(localStorage.getItem(key)!);
             const found = jobs?.find((j: Job) => j.job_id === jobId);
             if (found) return found;
-        } catch {
-            // skip
-        }
+        } catch { /* skip */ }
     }
     return null;
 }

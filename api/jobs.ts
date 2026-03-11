@@ -1,31 +1,20 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const SERPAPI_BASE = 'https://serpapi.com/search.json';
+const REMOTIVE_BASE = 'https://remotive.com/api/remote-jobs';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // Only allow GET
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const q = req.query.q;
-    if (!q || typeof q !== 'string') {
-        return res.status(400).json({ error: 'Missing "q" query parameter' });
-    }
+    const category = typeof req.query.category === 'string' ? req.query.category : '';
+    const limit = typeof req.query.limit === 'string' ? req.query.limit : '50';
 
-    const apiKey = process.env.SERPAPI_KEY;
-    if (!apiKey) {
-        return res.status(500).json({ error: 'SerpApi key not configured on server' });
-    }
-
-    const params = new URLSearchParams({
-        engine: 'google_jobs',
-        q,
-        api_key: apiKey,
-    });
+    const params = new URLSearchParams({ limit });
+    if (category) params.set('category', category);
 
     try {
-        const response = await fetch(`${SERPAPI_BASE}?${params.toString()}`);
+        const response = await fetch(`${REMOTIVE_BASE}?${params.toString()}`);
 
         if (!response.ok) {
             const text = await response.text();
@@ -34,11 +23,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const data = await response.json();
 
-        // Cache on CDN for 24 hours, allow stale for 1 hour
         res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=3600');
         return res.status(200).json(data);
     } catch (error: any) {
-        console.error('SerpApi proxy error:', error);
-        return res.status(502).json({ error: 'Failed to fetch from SerpApi' });
+        console.error('Remotive proxy error:', error);
+        return res.status(502).json({ error: 'Failed to fetch from Remotive' });
     }
 }
