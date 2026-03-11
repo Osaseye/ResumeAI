@@ -155,7 +155,7 @@ function mapRemotiveItem(item: any): Job {
     return {
         job_id: `remotive_${item.id}`,
         employer_name: item.company_name || 'Unknown Company',
-        employer_logo: item.company_logo_url || item.company_logo || undefined,
+        employer_logo: undefined, // External logos are blocked by CORS
         job_title: item.title || 'Untitled Position',
         job_city: '',
         job_country: loc,
