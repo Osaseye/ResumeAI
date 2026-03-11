@@ -1,4 +1,4 @@
-// JSearch (RapidAPI) integration with per-device daily rate limiting.
+// SerpApi (Google Jobs engine) integration with per-device daily rate limiting.
 // Each device (browser) gets one fresh API call per day.
 // Results are cached per-query for 24 hours. No mock/fallback data.
 
@@ -19,7 +19,7 @@ export interface Job {
     match_score?: number;
 }
 
-const API_HOST = 'jsearch.p.rapidapi.com';
+const SERPAPI_BASE = 'https://serpapi.com/search.json';
 const DEVICE_CALL_KEY = 'device_job_api_date';
 const PRIMARY_JOBS_KEY = 'primary_jobs_cache';
 
@@ -83,30 +83,84 @@ function getAnyCachedJobs(): Job[] | null {
     return best?.jobs ?? null;
 }
 
-function mapApiItemToJob(item: any): Job {
+/** Map a SerpApi Google Jobs result item to our Job interface */
+function mapSerpApiItem(item: any, index: number): Job {
+    const extensions = item.detected_extensions || {};
+    const applyLink = item.apply_options?.[0]?.link
+        || item.share_link
+        || item.related_links?.[0]?.link
+        || '';
+
+    // Parse salary from extensions
+    let minSalary: number | undefined;
+    let maxSalary: number | undefined;
+    let currency: string | undefined;
+
+    if (extensions.salary) {
+        const salaryStr: string = extensions.salary;
+        const nums = salaryStr.replace(/,/g, '').match(/[\d.]+/g);
+        if (nums && nums.length >= 2) {
+            minSalary = parseFloat(nums[0]);
+            maxSalary = parseFloat(nums[1]);
+            if (salaryStr.toLowerCase().includes('k')) {
+                minSalary *= 1000;
+                maxSalary *= 1000;
+            }
+        } else if (nums && nums.length === 1) {
+            minSalary = parseFloat(nums[0]);
+            if (salaryStr.toLowerCase().includes('k')) minSalary *= 1000;
+        }
+        currency = salaryStr.startsWith('₦') ? 'NGN'
+            : salaryStr.startsWith('$') ? 'USD'
+            : salaryStr.startsWith('€') ? 'EUR'
+            : salaryStr.startsWith('£') ? 'GBP'
+            : undefined;
+    }
+
+    const location = item.location || '';
+    const isRemote = /remote/i.test(location)
+        || /remote/i.test(extensions.schedule_type || '')
+        || /remote/i.test(item.title || '');
+
+    const locParts = location.split(',').map((s: string) => s.trim());
+    const city = locParts[0] || '';
+    const country = locParts[1] || (location.toLowerCase().includes('nigeria') ? 'Nigeria' : '');
+
     return {
-        job_id: item.job_id,
-        employer_name: item.employer_name,
-        employer_logo: item.employer_logo,
-        job_title: item.job_title,
-        job_city: item.job_city,
-        job_country: item.job_country,
-        job_is_remote: item.job_is_remote,
-        job_posted_at_timestamp: item.job_posted_at_timestamp * 1000,
-        job_description: item.job_description,
-        job_apply_link: item.job_apply_link,
-        job_min_salary: item.job_min_salary,
-        job_max_salary: item.job_max_salary,
-        job_salary_currency: item.job_salary_currency,
+        job_id: item.job_id || `serp_${index}_${Date.now()}`,
+        employer_name: item.company_name || 'Unknown Company',
+        employer_logo: item.thumbnail || undefined,
+        job_title: item.title || 'Untitled Position',
+        job_city: city,
+        job_country: country,
+        job_is_remote: isRemote,
+        job_posted_at_timestamp: extensions.posted_at
+            ? Date.now() - parseSerpApiAge(extensions.posted_at)
+            : Date.now(),
+        job_description: item.description || '',
+        job_apply_link: applyLink,
+        job_min_salary: minSalary,
+        job_max_salary: maxSalary,
+        job_salary_currency: currency,
         match_score: Math.floor(Math.random() * 20 + 80),
     };
+}
+
+/** Convert SerpApi age strings like "3 days ago" to milliseconds */
+function parseSerpApiAge(ageStr: string): number {
+    const num = parseInt(ageStr) || 1;
+    if (/hour/i.test(ageStr)) return num * 60 * 60 * 1000;
+    if (/day/i.test(ageStr)) return num * 24 * 60 * 60 * 1000;
+    if (/week/i.test(ageStr)) return num * 7 * 24 * 60 * 60 * 1000;
+    if (/month/i.test(ageStr)) return num * 30 * 24 * 60 * 60 * 1000;
+    return 24 * 60 * 60 * 1000;
 }
 
 export const jobsService = {
     async searchJobs(query: string, location: string = 'Nigeria'): Promise<Job[]> {
         const cacheKey = `job_search_${query}_${location}`;
 
-        // 1. Return cached results for this exact query if still valid
+        // 1. Return cached results if still valid
         const cached = getCachedJobs(cacheKey);
         if (cached) {
             console.log(`Serving cached jobs for "${query}" in ${location}`);
@@ -114,10 +168,10 @@ export const jobsService = {
         }
 
         // 2. Check per-device daily limit
-        const apiKey = import.meta.env.VITE_RAPIDAPI_KEY;
+        const apiKey = import.meta.env.VITE_SERPAPI_KEY;
 
         if (!apiKey) {
-            console.warn('RapidAPI key missing. Returning cached results if available.');
+            console.warn('SerpApi key missing. Returning cached results if available.');
             return getAnyCachedJobs() ?? [];
         }
 
@@ -126,54 +180,38 @@ export const jobsService = {
             return getAnyCachedJobs() ?? [];
         }
 
-        // 3. Make the API call (device's one call for today)
-        console.log(`Searching for "${query}" in ${location}...`);
+        // 3. Make the SerpApi call
+        console.log(`Searching SerpApi for "${query}" in ${location}...`);
 
-        const options = {
-            method: 'GET',
-            headers: {
-                'X-RapidAPI-Key': apiKey,
-                'X-RapidAPI-Host': API_HOST,
-            },
-        };
+        const params = new URLSearchParams({
+            engine: 'google_jobs',
+            q: `${query} in ${location}`,
+            api_key: apiKey,
+        });
 
         try {
-            const response = await fetch(
-                `https://${API_HOST}/search?query=${encodeURIComponent(query + ' in ' + location)}&num_pages=1`,
-                options
-            );
+            const response = await fetch(`${SERPAPI_BASE}?${params.toString()}`);
 
             if (!response.ok) {
-                if (response.status === 429) {
-                    console.warn('RapidAPI rate limit exceeded.');
-                }
-                if (response.status === 403) {
-                    console.warn('RapidAPI forbidden — check API key.');
-                }
-                throw new Error(`RapidAPI Error: ${response.status} ${response.statusText}`);
+                throw new Error(`SerpApi Error: ${response.status} ${response.statusText}`);
             }
 
             const data = await response.json();
 
-            if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
-                console.warn('No jobs found from API for this query.');
-                // Still count as a used call — the API responded successfully
+            if (!data.jobs_results || !Array.isArray(data.jobs_results) || data.jobs_results.length === 0) {
+                console.warn('No jobs found from SerpApi for this query.');
                 recordDeviceCall();
                 return [];
             }
 
-            const jobs: Job[] = data.data.map(mapApiItemToJob);
+            const jobs: Job[] = data.jobs_results.slice(0, 10).map(mapSerpApiItem);
 
-            // Cache this query's results
             localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), jobs }));
-
-            // Mark the device call as used for today
             recordDeviceCall();
 
             return jobs;
         } catch (error) {
-            console.error('Error searching jobs:', error);
-            // On error, try returning any valid cached results
+            console.error('Error searching jobs via SerpApi:', error);
             return getAnyCachedJobs() ?? [];
         }
     },
@@ -214,41 +252,9 @@ export const jobsService = {
     },
 
     async getJobDetails(jobId: string): Promise<Job | null> {
-        // First try to find the job in any cached search results
-        const cachedJob = findJobInCache(jobId);
-        if (cachedJob) return cachedJob;
-
-        // Fall back to JSearch job-details endpoint (does NOT count toward daily limit
-        // since it's a detail lookup, not a search)
-        console.log(`Fetching details for job ${jobId}...`);
-
-        const apiKey = import.meta.env.VITE_RAPIDAPI_KEY;
-        if (!apiKey) return null;
-
-        const options = {
-            method: 'GET',
-            headers: {
-                'X-RapidAPI-Key': apiKey,
-                'X-RapidAPI-Host': API_HOST,
-            },
-        };
-
-        try {
-            const response = await fetch(
-                `https://${API_HOST}/job-details?job_id=${encodeURIComponent(jobId)}`,
-                options
-            );
-            if (!response.ok) throw new Error('Failed to fetch job details');
-
-            const data = await response.json();
-            const item = data.data?.[0];
-            if (!item) return null;
-
-            return mapApiItemToJob(item);
-        } catch (error) {
-            console.error('Error fetching job details:', error);
-            return null;
-        }
+        // SerpApi Google Jobs doesn't have a dedicated job-details endpoint,
+        // so we look up from cached search results only.
+        return findJobInCache(jobId);
     },
 };
 
