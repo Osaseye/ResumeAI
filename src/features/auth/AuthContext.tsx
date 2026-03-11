@@ -7,7 +7,7 @@ import { auth } from '../../lib/firebase';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  logout: () => Promise<void>;
+  logout: () => Promise<void>;    
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);

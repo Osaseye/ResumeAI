@@ -27,6 +27,7 @@ const REMOTIVE_BASE = 'https://remotive.com/api/remote-jobs';
 const ROLE_CATEGORY_MAP: Record<string, string> = {
     'software': 'software-dev',
     'developer': 'software-dev',
+    'programmer': 'software-dev',
     'engineer': 'software-dev',
     'frontend': 'software-dev',
     'backend': 'software-dev',
@@ -46,9 +47,11 @@ const ROLE_CATEGORY_MAP: Record<string, string> = {
     'ux': 'design',
     'product': 'product',
     'project': 'project-management',
-    'manager': 'project-management',
     'marketing': 'marketing',
+    'social media': 'marketing',
+    'seo': 'marketing',
     'sales': 'sales',
+    'business development': 'sales',
     'customer': 'customer-service',
     'support': 'customer-service',
     'qa': 'qa',
@@ -56,21 +59,33 @@ const ROLE_CATEGORY_MAP: Record<string, string> = {
     'writing': 'writing',
     'content': 'writing',
     'copywriter': 'writing',
+    'editor': 'writing',
     'finance': 'finance-legal',
     'accounting': 'finance-legal',
     'legal': 'finance-legal',
     'human resources': 'hr',
     'hr': 'hr',
     'recruiter': 'hr',
+    'virtual assistant': 'all-others',
+    'assistant': 'all-others',
+    'admin': 'all-others',
+    'secretary': 'all-others',
+    'clerk': 'all-others',
+    'manager': 'project-management',
+    'operations': 'all-others',
+    'teacher': 'all-others',
+    'tutor': 'all-others',
+    'education': 'all-others',
 };
 
-/** Convert a user role string to the best Remotive category slug */
+/** Convert a user role string to the best Remotive category slug.
+ *  Returns empty string for unrecognised roles (fetches all categories). */
 function roleToCategory(role: string): string {
     const lower = role.toLowerCase();
     for (const [keyword, cat] of Object.entries(ROLE_CATEGORY_MAP)) {
         if (lower.includes(keyword)) return cat;
     }
-    return 'software-dev';
+    return ''; // No filter — fetch from all categories
 }
 
 /** Check if a job's location allows Nigerian applicants */
@@ -181,11 +196,11 @@ function stripHtml(html: string): string {
 export const jobsService = {
     async searchJobs(query: string, _location: string = 'Nigeria'): Promise<Job[]> {
         const category = roleToCategory(query);
-        const cacheKey = `job_search_${category}`;
+        const cacheKey = `job_search_${category || 'all'}`;
 
         const cached = getCachedJobs(cacheKey);
         if (cached) {
-            console.log(`Serving cached jobs for "${category}"`);
+            console.log(`Serving cached jobs for "${category || 'all'}"`);
             return cached;
         }
 
@@ -194,11 +209,13 @@ export const jobsService = {
             return getAnyCachedJobs() ?? [];
         }
 
-        console.log(`Fetching remote jobs (category: ${category}) from Remotive...`);
+        console.log(`Fetching remote jobs (category: ${category || 'all'}) from Remotive...`);
 
         try {
             // Fetch more than needed so we can filter for Nigeria-eligible roles
-            const url = `${REMOTIVE_BASE}?category=${category}&limit=50`;
+            const params = new URLSearchParams({ limit: '50' });
+            if (category) params.set('category', category);
+            const url = `${REMOTIVE_BASE}?${params.toString()}`;
             const response = await fetch(url);
 
             if (!response.ok) {
