@@ -1,6 +1,5 @@
-// SerpApi (Google Jobs engine) integration with per-device daily rate limiting.
-// Each device (browser) gets one fresh API call per day.
-// Results are cached per-query for 24 hours. No mock/fallback data.
+// SerpApi (Google Jobs engine) via Vercel serverless proxy.
+// Per-device daily rate limiting. Cached per-query for 24 hours.
 
 export interface Job {
     job_id: string;
@@ -19,7 +18,6 @@ export interface Job {
     match_score?: number;
 }
 
-const SERPAPI_BASE = 'https://serpapi.com/search.json';
 const DEVICE_CALL_KEY = 'device_job_api_date';
 const PRIMARY_JOBS_KEY = 'primary_jobs_cache';
 
@@ -168,38 +166,29 @@ export const jobsService = {
         }
 
         // 2. Check per-device daily limit
-        const apiKey = import.meta.env.VITE_SERPAPI_KEY;
-
-        if (!apiKey) {
-            console.warn('SerpApi key missing. Returning cached results if available.');
-            return getAnyCachedJobs() ?? [];
-        }
-
         if (hasDeviceCalledToday()) {
             console.log('Device API call already used today. Returning cached results.');
             return getAnyCachedJobs() ?? [];
         }
 
-        // 3. Make the SerpApi call
-        console.log(`Searching SerpApi for "${query}" in ${location}...`);
+        // 3. Call our Vercel serverless proxy (avoids CORS, keeps key server-side)
+        console.log(`Fetching jobs for "${query}" in ${location} via proxy...`);
 
         const params = new URLSearchParams({
-            engine: 'google_jobs',
             q: `${query} in ${location}`,
-            api_key: apiKey,
         });
 
         try {
-            const response = await fetch(`${SERPAPI_BASE}?${params.toString()}`);
+            const response = await fetch(`/api/jobs?${params.toString()}`);
 
             if (!response.ok) {
-                throw new Error(`SerpApi Error: ${response.status} ${response.statusText}`);
+                throw new Error(`Job API Error: ${response.status} ${response.statusText}`);
             }
 
             const data = await response.json();
 
             if (!data.jobs_results || !Array.isArray(data.jobs_results) || data.jobs_results.length === 0) {
-                console.warn('No jobs found from SerpApi for this query.');
+                console.warn('No jobs found for this query.');
                 recordDeviceCall();
                 return [];
             }
@@ -211,7 +200,7 @@ export const jobsService = {
 
             return jobs;
         } catch (error) {
-            console.error('Error searching jobs via SerpApi:', error);
+            console.error('Error searching jobs:', error);
             return getAnyCachedJobs() ?? [];
         }
     },
