@@ -94,9 +94,13 @@ export const DashboardPage = () => {
                         localStorage.setItem('dashboard_profile_cache', JSON.stringify(userProfileData));
                     }
 
-                    // 2. Fetch Jobs based on User Profile
-                    const searchRole = userProfileData?.role || profile?.role || "Software Engineer";
-                    const jobs = await jobsService.searchJobs(searchRole, "Nigeria");
+                    // 2. Read stored jobs — fetch if empty (handles existing users
+                    //    who registered before the onboarding fetch was added)
+                    let jobs = jobsService.getStoredJobs();
+                    if (jobs.length === 0) {
+                        const searchRole = userProfileData?.role || profile?.role || 'Software Engineer';
+                        jobs = await jobsService.fetchAndStoreJobs(searchRole);
+                    }
                     
                     // Only update if data changed (simple length check or deep comparison could be better)
                     if (JSON.stringify(jobs.slice(0, 5)) !== JSON.stringify(recentJobs)) {

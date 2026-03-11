@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from './AuthContext';
+import { jobsService } from '@/features/jobs/services/jobService';
 
 // Validation Schema
 const onboardingSchema = z.object({
@@ -89,6 +90,9 @@ export const OnboardingPage = () => {
         onboardingComplete: true
       });
       
+      // Trigger the single daily job scrape using the user's target role
+      jobsService.fetchAndStoreJobs(data.role).catch(console.error);
+
       toast.success("Profile setup complete!", {
         description: "Welcome to your new dashboard.",
       });

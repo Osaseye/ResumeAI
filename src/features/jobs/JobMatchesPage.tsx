@@ -40,8 +40,15 @@ export const JobMatchesPage = () => {
                 }
             }
             
-            const data = await jobsService.searchJobs(role, 'Nigeria');
-            setJobs(data);
+            // Read from the primary jobs cache (populated at onboarding)
+            const stored = jobsService.getStoredJobs();
+            if (stored.length > 0) {
+                setJobs(stored);
+            } else {
+                // Fallback: attempt a search (will use cache or daily limit)
+                const data = await jobsService.searchJobs(role, 'Nigeria');
+                setJobs(data);
+            }
         } catch (error) {
             console.error(error);
             toast.error("Failed to load jobs");

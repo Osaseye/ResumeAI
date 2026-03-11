@@ -44,27 +44,8 @@ export const ResumeDetailsPage = () => {
                 if (data) {
                     setResume(data);
                     
-                    // Fetch jobs from dashboard cache or general pool to avoid new API calls
-                    // Use the same logic as Dashboard/JobMatches to maximize cache hit
-                    let jobs: Job[] = [];
-                    const dashboardJobs = localStorage.getItem('dashboard_jobs_cache');
-                    
-                    if (dashboardJobs) {
-                        try {
-                            jobs = JSON.parse(dashboardJobs);
-                        } catch (e) {
-                            console.error("Error parsing dashboard jobs", e);
-                        }
-                    }
-
-                    // If no dashboard jobs, try to use the resume title but check cache first via service
-                    // Note: ensure we don't trigger new API calls if possible, relying on service cache
-                    if (jobs.length === 0) {
-                         const query = data.title || "Software Engineer";
-                         const location = data.contact?.location || "Nigeria";
-                         // This might hit API if not cached, but it's the fallback
-                         jobs = await jobsService.searchJobs(query, location);
-                    }
+                    // Read from the primary jobs cache (populated at onboarding)
+                    const jobs: Job[] = jobsService.getStoredJobs();
                     
                     // Filter/Sort by "best fit" (simple client-side logic)
                     // We want the one that fits the resume best.
