@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { onAuthStateChanged, signOut as firebaseSignOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { onAuthStateChanged, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import { storage } from '@/utils/storage';

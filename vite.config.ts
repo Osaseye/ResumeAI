@@ -44,8 +44,8 @@ export default defineConfig({
               throw new Error('Adzuna API returned ' + fetchRes.status);
             }
             
-            const data = await fetchRes.json();
-            console.log(`[Dev Proxy Server] Success! Adzuna returned ${data.results?.length || 0} jobs.`);
+            const data = await fetchRes.json() as any;
+            console.log(`[Dev Proxy Server] Success! Adzuna returned ${data?.results?.length || 0} jobs.`);
 
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify(data));
