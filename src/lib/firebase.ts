@@ -21,4 +21,4 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const ai = getAI(app, { backend: new VertexAIBackend() });
-export const model = getGenerativeModel(ai, { model: "gemini-2.0-flash-001" });
+export const getModel = () => getGenerativeModel(ai, { model: "gemini-2.0-flash-001" });

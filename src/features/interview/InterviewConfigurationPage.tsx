@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { resumeService } from '@/features/resumes/services/resumeService';
 import { type Job } from '@/features/jobs/services/jobService';
 import type { Resume } from '@/features/resumes/types';
+import { storage } from '@/utils/storage';
 
 export const InterviewConfigurationPage = () => {
     const navigate = useNavigate();
@@ -32,7 +33,7 @@ export const InterviewConfigurationPage = () => {
 
              // 2. Fetch Saved Jobs
              // JobMatchesPage saves full job objects in 'saved_jobs_data'
-             const savedJobsData = localStorage.getItem('saved_jobs_data');
+             const savedJobsData = storage.getItem('saved_jobs_data');
              
              if (savedJobsData) {
                  try {

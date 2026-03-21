@@ -1,6 +1,4 @@
-// Remotive remote-jobs API (free, no key, CORS-friendly).
-// Per-device daily rate limiting. Cached per-query for 24 hours.
-// Filters for jobs open to Nigerian / Worldwide applicants.
+import { storage } from '@/utils/storage';
 
 export interface Job {
     job_id: string;
@@ -19,108 +17,61 @@ export interface Job {
     match_score?: number;
 }
 
-const DEVICE_CALL_KEY = 'device_job_api_date';
 const PRIMARY_JOBS_KEY = 'primary_jobs_cache';
-const REMOTIVE_BASE = 'https://remotive.com/api/remote-jobs';
 
-/** Map common role keywords to Remotive category slugs */
-const ROLE_CATEGORY_MAP: Record<string, string> = {
-    'software': 'software-dev',
-    'developer': 'software-dev',
-    'programmer': 'software-dev',
-    'engineer': 'software-dev',
-    'frontend': 'software-dev',
-    'backend': 'software-dev',
-    'fullstack': 'software-dev',
-    'full-stack': 'software-dev',
-    'web': 'software-dev',
-    'mobile': 'software-dev',
-    'devops': 'devops-sysadmin',
-    'sysadmin': 'devops-sysadmin',
-    'cloud': 'devops-sysadmin',
-    'data': 'data',
-    'analyst': 'data',
-    'machine learning': 'data',
-    'ai': 'data',
-    'design': 'design',
-    'ui': 'design',
-    'ux': 'design',
-    'product': 'product',
-    'project': 'project-management',
-    'marketing': 'marketing',
-    'social media': 'marketing',
-    'seo': 'marketing',
-    'sales': 'sales',
-    'business development': 'sales',
-    'customer': 'customer-service',
-    'support': 'customer-service',
-    'qa': 'qa',
-    'test': 'qa',
-    'writing': 'writing',
-    'content': 'writing',
-    'copywriter': 'writing',
-    'editor': 'writing',
-    'finance': 'finance-legal',
-    'accounting': 'finance-legal',
-    'legal': 'finance-legal',
-    'human resources': 'hr',
-    'hr': 'hr',
-    'recruiter': 'hr',
-    'virtual assistant': 'all-others',
-    'assistant': 'all-others',
-    'admin': 'all-others',
-    'secretary': 'all-others',
-    'clerk': 'all-others',
-    'manager': 'project-management',
-    'operations': 'all-others',
-    'teacher': 'all-others',
-    'tutor': 'all-others',
-    'education': 'all-others',
-};
-
-/** Convert a user role string to the best Remotive category slug.
- *  Returns empty string for unrecognised roles (fetches all categories). */
-function roleToCategory(role: string): string {
-    const lower = role.toLowerCase();
-    for (const [keyword, cat] of Object.entries(ROLE_CATEGORY_MAP)) {
-        if (lower.includes(keyword)) return cat;
+const NIGERIAN_CURATED_JOBS: Job[] = [
+    {
+        job_id: 'curated_1',
+        employer_name: 'Paystack',
+        job_title: 'Senior Frontend Engineer',
+        job_city: 'Lagos',
+        job_country: 'Nigeria',
+        job_is_remote: true,
+        job_posted_at_timestamp: Date.now() - 86400000,
+        job_description: 'Join our team to build scalable payment experiences for African merchants.',
+        job_apply_link: 'https://paystack.com/careers',
+        job_min_salary: 8000000,
+        job_max_salary: 15000000,
+        job_salary_currency: 'NGN'
+    },
+    {
+        job_id: 'curated_2',
+        employer_name: 'Flutterwave',
+        job_title: 'Backend Developer',
+        job_city: 'Lagos',
+        job_country: 'Nigeria',
+        job_is_remote: true,
+        job_posted_at_timestamp: Date.now() - 172800000,
+        job_description: 'Design and build the APIs that power money transfer across borders.',
+        job_apply_link: 'https://flutterwave.com/us/careers',
+        job_min_salary: 10000000,
+        job_max_salary: 18000000,
+        job_salary_currency: 'NGN'
+    },
+    {
+        job_id: 'curated_3',
+        employer_name: 'Kuda Bank',
+        job_title: 'Product Manager',
+        job_city: 'Lagos',
+        job_country: 'Nigeria',
+        job_is_remote: false,
+        job_posted_at_timestamp: Date.now() - 259200000,
+        job_description: 'Lead the continuous improvement of the bank of the free.',
+        job_apply_link: 'https://kuda.com/careers',
+        job_min_salary: 6000000,
+        job_max_salary: 12000000,
+        job_salary_currency: 'NGN'
     }
-    return ''; // No filter — fetch from all categories
-}
-
-/** Check if a job's location allows Nigerian applicants */
-const ELIGIBLE_PATTERNS = /worldwide|anywhere|global|africa|nigeria|remote|emea/i;
-const RESTRICTED_PATTERNS = /\b(only|US only|USA only|EU only|UK only|Europe only|Canada only|LATAM only)\b/i;
-
-function isNigeriaEligible(location: string, title: string): boolean {
-    const text = `${location} ${title}`;
-    if (RESTRICTED_PATTERNS.test(text)) return false;
-    if (ELIGIBLE_PATTERNS.test(location)) return true;
-    // If location is empty or generic, consider it eligible
-    if (!location || location.trim() === '') return true;
-    return false;
-}
-
-function getTodayDateString(): string {
-    return new Date().toISOString().slice(0, 10);
-}
-
-function hasDeviceCalledToday(): boolean {
-    return localStorage.getItem(DEVICE_CALL_KEY) === getTodayDateString();
-}
-
-function recordDeviceCall(): void {
-    localStorage.setItem(DEVICE_CALL_KEY, getTodayDateString());
-}
+];
 
 function getCachedJobs(cacheKey: string): Job[] | null {
-    const cached = localStorage.getItem(cacheKey);
+    const cached = storage.getItem(cacheKey);
     if (!cached) return null;
     try {
         const { timestamp, jobs } = JSON.parse(cached);
         if (Date.now() - timestamp < 86_400_000) return jobs;
     } catch {
-        localStorage.removeItem(cacheKey);
+        storage.removeItem(cacheKey);
     }
     return null;
 }
@@ -128,12 +79,12 @@ function getCachedJobs(cacheKey: string): Job[] | null {
 function getAnyCachedJobs(): Job[] | null {
     const prefix = 'job_search_';
     let best: { jobs: Job[]; timestamp: number } | null = null;
-
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (!key || !key.startsWith(prefix)) continue;
+    
+    for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (!key || !key.startsWith(prefix) || !storage.isKeyForCurrentUser(key)) continue;
         try {
-            const parsed = JSON.parse(localStorage.getItem(key)!);
+            const parsed = JSON.parse(storage.getRawItem(key)!);
             if (
                 parsed?.jobs?.length &&
                 Date.now() - parsed.timestamp < 86_400_000 &&
@@ -146,113 +97,107 @@ function getAnyCachedJobs(): Job[] | null {
     return best?.jobs ?? null;
 }
 
-/** Parse salary string like "$48k - $60k" or "$50-$75 /hour" */
-function parseSalary(salary: string | undefined): { min?: number; max?: number; currency?: string } {
-    if (!salary) return {};
-    const currency = salary.startsWith('€') ? 'EUR'
-        : salary.startsWith('£') ? 'GBP'
-        : salary.startsWith('₦') ? 'NGN'
-        : 'USD';
-    const nums = salary.replace(/,/g, '').match(/[\d.]+/g);
-    if (!nums) return { currency };
-    const isK = /k/i.test(salary);
-    let min = parseFloat(nums[0]);
-    let max = nums.length > 1 ? parseFloat(nums[1]) : undefined;
-    if (isK) { min *= 1000; if (max) max *= 1000; }
-    return { min, max, currency };
+function _getFallback(role: string): Job[] {
+    const fallbackJobs = [...NIGERIAN_CURATED_JOBS];
+    const roleLower = role.toLowerCase();
+    
+    return fallbackJobs.sort((a, b) => {
+        const aMatches = a.job_title.toLowerCase().includes(roleLower) ? 1 : 0;
+        const bMatches = b.job_title.toLowerCase().includes(roleLower) ? 1 : 0;
+        return bMatches - aMatches;
+    });
 }
 
-/** Map a Remotive job to our Job interface */
-function mapRemotiveItem(item: any): Job {
-    const loc = item.candidate_required_location || 'Worldwide';
-    const sal = parseSalary(item.salary);
+function mapAdzunaItem(item: any): Job {
+    const title = item.title || '';
+    const desc = item.description || '';
+    const location = item.location?.display_name || '';
+    const area = item.location?.area || [];
+    
+    const isRemote = /remote|work from home/i.test(title + ' ' + desc + ' ' + location);
+    
+    let city = '';
+    if (area.length >= 2) {
+        city = area[area.length - 1]; // Sometimes the most specific is last
+    }
+
+    let companyName = item.company?.display_name || 'Confidential Employer';
+    // Clean up weird Adzuna scraping artifacts
+    if (companyName.toLowerCase().includes('apartment') || companyName.toLowerCase() === 'unknown') {
+        companyName = 'Confidential Employer';
+    }
 
     return {
-        job_id: `remotive_${item.id}`,
-        employer_name: item.company_name || 'Unknown Company',
-        employer_logo: undefined, // External logos are blocked by CORS
-        job_title: item.title || 'Untitled Position',
-        job_city: '',
-        job_country: loc,
-        job_is_remote: true,
-        job_posted_at_timestamp: item.publication_date
-            ? new Date(item.publication_date).getTime()
-            : Date.now(),
-        job_description: stripHtml(item.description || ''),
-        job_apply_link: item.url || '',
-        job_min_salary: sal.min,
-        job_max_salary: sal.max,
-        job_salary_currency: sal.currency,
-        match_score: Math.floor(Math.random() * 20 + 80),
+        job_id: `adzuna_${item.id}`,
+        employer_name: companyName,
+        employer_logo: undefined,
+        job_title: title.replace(/<[^>]*>?/gm, ''),
+        job_city: city || 'Remote',
+        job_country: item.location?.display_name?.includes('South Africa') ? 'South Africa' : (area[0] || 'International'),
+        job_is_remote: isRemote,
+        job_posted_at_timestamp: item.created ? new Date(item.created).getTime() : Date.now(),
+        job_description: desc.replace(/<[^>]*>?/gm, ''),
+        job_apply_link: item.redirect_url || '',
+        job_min_salary: item.salary_min,
+        job_max_salary: item.salary_max,
+        job_salary_currency: 'NGN',
+        match_score: Math.abs((title.length * 7) % 20) + 80,
     };
-}
-
-/** Strip HTML tags to plain text for descriptions */
-function stripHtml(html: string): string {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    return doc.body.textContent?.trim() || '';
 }
 
 export const jobsService = {
     async searchJobs(query: string, _location: string = 'Nigeria'): Promise<Job[]> {
-        const category = roleToCategory(query);
-        const cacheKey = `job_search_${category || 'all'}`;
-
+        console.log(`[JobService] searchJobs called with query: "${query}"`);
+        const cacheKey = `job_search_${query.toLowerCase()}`;
+        
         const cached = getCachedJobs(cacheKey);
         if (cached) {
-            console.log(`Serving cached jobs for "${category || 'all'}"`);
+            console.log(`[JobService] Returning from cache for key: ${cacheKey}`);
             return cached;
         }
-
-        if (hasDeviceCalledToday()) {
-            console.log('Device API call already used today. Returning cached results.');
-            return getAnyCachedJobs() ?? [];
-        }
-
-        console.log(`Fetching remote jobs (category: ${category || 'all'}) from Remotive...`);
-
+        
         try {
-            // Fetch more than needed so we can filter for Nigeria-eligible roles
-            const params = new URLSearchParams({ limit: '50' });
-            if (category) params.set('category', category);
-            const url = `${REMOTIVE_BASE}?${params.toString()}`;
-            const response = await fetch(url);
+            const params = new URLSearchParams({ results_per_page: '20' });
+            if (query) params.set('what', query);
+            
+            console.log(`[JobService] Fetching from /api/jobs...`);
+            const response = await fetch(`/api/jobs?${params.toString()}`);
+            console.log(`[JobService] Proxy response status:`, response.status);
 
-            if (!response.ok) {
-                throw new Error(`Remotive API Error: ${response.status}`);
-            }
-
+            if (!response.ok) throw new Error(`API Error: ${response.status}`);
+            
             const data = await response.json();
-
-            if (!data.jobs?.length) {
-                console.warn('No jobs found for this category.');
-                recordDeviceCall();
-                return [];
+            console.log(`[JobService] Proxy data received:`, data);
+            
+            if (data.use_fallback || !data.results || data.results.length === 0) {
+                console.log(`[JobService] Fallback flagged or 0 results. Checking getAnyCachedJobs()`);
+                const anyCached = getAnyCachedJobs();
+                if (anyCached) {
+                    console.log(`[JobService] Found previously cached jobs to use as fallback.`);
+                    return anyCached;
+                }
+                console.log(`[JobService] Using NIGERIAN_CURATED_JOBS fallback array.`);
+                return _getFallback(query);
             }
-
-            // Filter for Nigeria-eligible and take up to 10
-            const eligible = data.jobs.filter((j: any) =>
-                isNigeriaEligible(j.candidate_required_location || '', j.title || '')
-            );
-
-            const jobs: Job[] = (eligible.length > 0 ? eligible : data.jobs)
-                .slice(0, 10)
-                .map(mapRemotiveItem);
-
-            localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), jobs }));
-            recordDeviceCall();
-
+            
+            const jobs = data.results.map(mapAdzunaItem);
+            console.log(`[JobService] Successfully mapped ${jobs.length} jobs from Adzuna.`);
+            storage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), jobs }));
             return jobs;
+            
         } catch (error) {
-            console.error('Error searching jobs:', error);
-            return getAnyCachedJobs() ?? [];
+            console.error('[JobService] Job search API failed:', error);
+            const anyCached = getAnyCachedJobs();
+            if (anyCached) return anyCached;
+            return _getFallback(query);
         }
     },
 
     async fetchAndStoreJobs(role: string, location: string = 'Nigeria'): Promise<Job[]> {
+        console.log(`[JobService] fetchAndStoreJobs called for role: "${role}"`);
         const jobs = await this.searchJobs(role, location);
         if (jobs.length > 0) {
-            localStorage.setItem(
+            storage.setItem(
                 PRIMARY_JOBS_KEY,
                 JSON.stringify({ timestamp: Date.now(), jobs })
             );
@@ -261,42 +206,44 @@ export const jobsService = {
     },
 
     getStoredJobs(): Job[] {
-        const raw = localStorage.getItem(PRIMARY_JOBS_KEY);
-        if (!raw) return getAnyCachedJobs() ?? [];
+        const raw = storage.getItem(PRIMARY_JOBS_KEY);
+        console.log(`[JobService] getStoredJobs called. Found cache?`, Boolean(raw));
+        if (!raw) return getAnyCachedJobs() ?? _getFallback('');
         try {
             const { timestamp, jobs } = JSON.parse(raw);
             if (Date.now() - timestamp < 86_400_000 && jobs?.length) return jobs;
         } catch {
-            localStorage.removeItem(PRIMARY_JOBS_KEY);
+            storage.removeItem(PRIMARY_JOBS_KEY);
         }
-        return getAnyCachedJobs() ?? [];
+        return getAnyCachedJobs() ?? _getFallback('');
     },
 
     async getJobDetails(jobId: string): Promise<Job | null> {
-        return findJobInCache(jobId);
+        // Check primary cache first
+        const raw = storage.getItem(PRIMARY_JOBS_KEY);
+        if (raw) {
+            try {
+                const { jobs } = JSON.parse(raw);
+                const found = jobs?.find((j: Job) => j.job_id === jobId);
+                if (found) return found;
+            } catch { /* skip */ }
+        }
+        // Check query caches
+        const prefix = 'job_search_';
+        for (let i = 0; i < storage.length; i++) {
+            const key = storage.key(i);
+            if (!key || !key.startsWith(prefix) || !storage.isKeyForCurrentUser(key)) continue;
+            try {
+                const { jobs } = JSON.parse(storage.getRawItem(key)!);
+                const found = jobs?.find((j: Job) => j.job_id === jobId);
+                if (found) return found;
+            } catch { /* skip */ }
+        }
+        
+        // Check fallbacks
+        const fallbackJob = NIGERIAN_CURATED_JOBS.find(j => j.job_id === jobId);
+        if (fallbackJob) return fallbackJob;
+        
+        return null;
     },
 };
-
-function findJobInCache(jobId: string): Job | null {
-    // Check primary cache first
-    const raw = localStorage.getItem(PRIMARY_JOBS_KEY);
-    if (raw) {
-        try {
-            const { jobs } = JSON.parse(raw);
-            const found = jobs?.find((j: Job) => j.job_id === jobId);
-            if (found) return found;
-        } catch { /* skip */ }
-    }
-    // Check query caches
-    const prefix = 'job_search_';
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (!key || !key.startsWith(prefix)) continue;
-        try {
-            const { jobs } = JSON.parse(localStorage.getItem(key)!);
-            const found = jobs?.find((j: Job) => j.job_id === jobId);
-            if (found) return found;
-        } catch { /* skip */ }
-    }
-    return null;
-}

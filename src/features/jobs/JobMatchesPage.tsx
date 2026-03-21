@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/features/auth/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { storage } from '@/utils/storage';
 
 interface UserProfile {
   role: string;
@@ -20,7 +21,7 @@ export const JobMatchesPage = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [savedJobs, setSavedJobs] = useState<Job[]>(() => {
-      const saved = localStorage.getItem('saved_jobs_data');
+      const saved = storage.getItem('saved_jobs_data');
       return saved ? JSON.parse(saved) : [];
   });
 
@@ -72,7 +73,7 @@ export const JobMatchesPage = () => {
               toast.success("Job saved to your list");
           }
           
-          localStorage.setItem('saved_jobs_data', JSON.stringify(newSaved));
+          storage.setItem('saved_jobs_data', JSON.stringify(newSaved));
           return newSaved;
       });
   };
@@ -209,7 +210,7 @@ export const JobMatchesPage = () => {
               <div className="flex flex-col md:flex-row md:items-start justify-between mb-2">
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{job.job_title}</h3>
-                  <p className="text-gray-600 font-medium">{job.employer_name} • {job.job_city}, {job.job_country} {job.job_is_remote && '(Remote)'}</p>
+                  <p className="text-gray-600 font-medium">{job.employer_name} • {[job.job_city, job.job_country].filter(Boolean).join(', ')} {job.job_is_remote && '(Remote)'}</p>
                 </div>
                 <div className="mt-2 md:mt-0 flex flex-col items-start md:items-end">
                   {job.match_score && (

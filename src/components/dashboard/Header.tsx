@@ -5,6 +5,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
+import { storage } from '@/utils/storage';
 
 interface UserProfile {
   displayName: string;
@@ -17,7 +18,7 @@ export const Header = () => {
   
   // Initialize from cache to prevent flickering
   const [profile, setProfile] = useState<UserProfile | null>(() => {
-      const cached = localStorage.getItem('user_profile_cache');
+      const cached = storage.getItem('user_profile_cache');
       return cached ? JSON.parse(cached) : null;
   });
   
@@ -29,7 +30,7 @@ export const Header = () => {
         if (user?.uid) {
             try {
                 // First check if we have data from DashboardPage's cache which might be fresher
-                const dashboardCache = localStorage.getItem('dashboard_profile_cache');
+                const dashboardCache = storage.getItem('dashboard_profile_cache');
                 if (dashboardCache) {
                     const parsed = JSON.parse(dashboardCache);
                     if (parsed.displayName) {
@@ -43,7 +44,7 @@ export const Header = () => {
                     const data = docSnap.data() as UserProfile;
                     setProfile(data);
                     // Cache it
-                    localStorage.setItem('user_profile_cache', JSON.stringify(data));
+                    storage.setItem('user_profile_cache', JSON.stringify(data));
                 }
             } catch (error) {
                 console.error("Error fetching profile:", error);
@@ -90,9 +91,14 @@ export const Header = () => {
             <span className="material-symbols-outlined text-gray-400 text-[20px]">search</span>
           </span>
           <input 
-            className="block w-full pl-10 pr-3 py-2.5 border-none rounded-2xl bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-0 shadow-sm" 
+            className="block w-full pl-10 pr-3 py-2.5 border-none rounded-2xl bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-0 shadow-sm transition" 
             placeholder="Search resumes, jobs..." 
             type="text"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                navigate(`/jobs?q=${encodeURIComponent(e.currentTarget.value.trim())}`);
+              }
+            }}
           />
           <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
             <span className="text-gray-300 text-xs border border-gray-200 rounded px-1.5 py-0.5">⌘ K</span>

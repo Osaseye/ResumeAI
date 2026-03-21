@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 
@@ -12,6 +13,11 @@ interface InterviewFeedback {
   summary: string;
   strengths: string[];
   improvements: string[];
+  metrics?: {
+    clarity: number;
+    confidence: number;
+    keywordUsage: number;
+  };
 }
 
 export const InterviewResultsPage = () => {
@@ -19,6 +25,12 @@ export const InterviewResultsPage = () => {
   const location = useLocation();
   const messages = (location.state as { messages?: Message[] })?.messages || [];
   const feedback = (location.state as { feedback?: InterviewFeedback })?.feedback;
+
+  useEffect(() => {
+    if (messages.length === 0 && !feedback) {
+      navigate('/mock-interview', { replace: true });
+    }
+  }, [messages.length, feedback, navigate]);
 
   // Filter out user answers for display in mock analysis
   const userAnswers = messages.filter(m => m.role === 'user');
@@ -101,28 +113,28 @@ export const InterviewResultsPage = () => {
                         <div>
                             <div className="flex justify-between text-sm mb-1">
                                 <span className="font-medium text-gray-700">Clarity & Pacing</span>
-                                <span className="font-bold text-indigo-600">88/100</span>
+                                <span className="font-bold text-indigo-600">{feedback?.metrics?.clarity || 88}/100</span>
                             </div>
                             <div className="w-full bg-gray-100 rounded-full h-2">
-                                <div className="bg-indigo-500 h-2 rounded-full" style={{ width: '88%' }}></div>
+                                <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${feedback?.metrics?.clarity || 88}%` }}></div>
                             </div>
                         </div>
                         <div>
                             <div className="flex justify-between text-sm mb-1">
                                 <span className="font-medium text-gray-700">Confidence Tone</span>
-                                <span className="font-bold text-blue-600">95/100</span>
+                                <span className="font-bold text-blue-600">{feedback?.metrics?.confidence || 95}/100</span>
                             </div>
                             <div className="w-full bg-gray-100 rounded-full h-2">
-                                <div className="bg-blue-500 h-2 rounded-full" style={{ width: '95%' }}></div>
+                                <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${feedback?.metrics?.confidence || 95}%` }}></div>
                             </div>
                         </div>
                          <div>
                             <div className="flex justify-between text-sm mb-1">
                                 <span className="font-medium text-gray-700">Keyword Usage</span>
-                                <span className="font-bold text-purple-600">76/100</span>
+                                <span className="font-bold text-purple-600">{feedback?.metrics?.keywordUsage || 76}/100</span>
                             </div>
                             <div className="w-full bg-gray-100 rounded-full h-2">
-                                <div className="bg-purple-500 h-2 rounded-full" style={{ width: '76%' }}></div>
+                                <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${feedback?.metrics?.keywordUsage || 76}%` }}></div>
                             </div>
                         </div>
                     </div>

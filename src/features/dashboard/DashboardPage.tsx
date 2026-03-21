@@ -4,11 +4,13 @@ import { useRef, useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { logEvent } from 'firebase/analytics';
+import { db, analytics } from '@/lib/firebase';
 import { jobsService, type Job } from '@/features/jobs/services/jobService';
 import { resumeService } from '@/features/resumes/services/resumeService';
 import { coverLetterService } from '@/features/cover-letter/services/coverLetterService';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { storage } from '@/utils/storage';
 
 interface UserProfile {
   displayName: string;
@@ -38,12 +40,12 @@ export const DashboardPage = () => {
 
     // Initialize state from local storage cache for instant loading
     const [profile, setProfile] = useState<UserProfile | null>(() => {
-        const cached = localStorage.getItem('dashboard_profile_cache');
+        const cached = storage.getItem('dashboard_profile_cache');
         return cached ? JSON.parse(cached) : null;
     });
 
     const [stats, setStats] = useState<DashboardStats>(() => {
-        const cached = localStorage.getItem('dashboard_stats_cache');
+        const cached = storage.getItem('dashboard_stats_cache');
         return cached ? JSON.parse(cached) : {
             resumeHealth: 0,
             atsScore: 0,
@@ -54,13 +56,13 @@ export const DashboardPage = () => {
     
     // "Recent Job Listings"
     const [recentJobs, setRecentJobs] = useState<Job[]>(() => {
-        const cached = localStorage.getItem('dashboard_jobs_cache');
+        const cached = storage.getItem('dashboard_jobs_cache');
         return cached ? JSON.parse(cached) : [];
     });
     
     // "Recent Sessions"
     const [recentSessions, setRecentSessions] = useState<InterviewSession[]>(() => {
-        const statsStr = localStorage.getItem('interview_stats');
+        const statsStr = storage.getItem('interview_stats');
         if (statsStr) {
              const parsed = JSON.parse(statsStr);
              return parsed.history ? parsed.history.slice().reverse().slice(0, 3) : [];
@@ -80,6 +82,9 @@ export const DashboardPage = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
+        if (analytics) {
+            logEvent(analytics, 'dashboard_view');
+        }
         const fetchData = async () => {
             if (user?.uid) {
                 try {
@@ -91,21 +96,21 @@ export const DashboardPage = () => {
                     if (docSnap.exists()) {
                         userProfileData = docSnap.data() as UserProfile;
                         setProfile(userProfileData);
-                        localStorage.setItem('dashboard_profile_cache', JSON.stringify(userProfileData));
+                        storage.setItem('dashboard_profile_cache', JSON.stringify(userProfileData));
                     }
 
-                    // 2. Read stored jobs — fetch if empty (handles existing users
-                    //    who registered before the onboarding fetch was added)
+                    // 2. Read stored jobs — fetch if we are falling back to curated mocks
                     let jobs = jobsService.getStoredJobs();
-                    if (jobs.length === 0) {
+                    if (jobs.length === 0 || jobs.every(j => j.job_id.startsWith('curated_'))) {
                         const searchRole = userProfileData?.role || profile?.role || 'Software Engineer';
+                        console.log(`[Dashboard] No live cache found. Fetching live jobs for:`, searchRole);
                         jobs = await jobsService.fetchAndStoreJobs(searchRole);
                     }
                     
                     // Only update if data changed (simple length check or deep comparison could be better)
                     if (JSON.stringify(jobs.slice(0, 5)) !== JSON.stringify(recentJobs)) {
                         setRecentJobs(jobs.slice(0, 5));
-                        localStorage.setItem('dashboard_jobs_cache', JSON.stringify(jobs.slice(0, 5)));
+                        storage.setItem('dashboard_jobs_cache', JSON.stringify(jobs.slice(0, 5)));
                     }
 
                     // 3. Fetch User Activity (Resumes, Cover Letters)
@@ -121,7 +126,7 @@ export const DashboardPage = () => {
                     });
 
                     // 4. Stats Calculation
-                    const statsStr = localStorage.getItem('interview_stats');
+                    const statsStr = storage.getItem('interview_stats');
 
                     // Calculate average health of resumes
                     let totalHealth = 0;
@@ -199,7 +204,7 @@ export const DashboardPage = () => {
                     }
 
                     // Count Saved Jobs
-                    const savedJobsStr = localStorage.getItem('saved_jobs_data');
+                    const savedJobsStr = storage.getItem('saved_jobs_data');
                     if (savedJobsStr) {
                         try {
                            // Keep previous logic or update?
@@ -212,7 +217,7 @@ export const DashboardPage = () => {
 
                     // 4. Set & Cache Stats
                     setStats(newStats);
-                    localStorage.setItem('dashboard_stats_cache', JSON.stringify(newStats));
+                    storage.setItem('dashboard_stats_cache', JSON.stringify(newStats));
 
                 } catch (error) {
                     console.error("Error fetching dashboard data:", error);

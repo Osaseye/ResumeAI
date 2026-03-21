@@ -1,7 +1,5 @@
-
-
-
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Navbar } from '@/components/landing/Navbar';
 import { Hero } from '@/components/landing/Hero';
 import { LogoTicker } from '@/components/landing/LogoTicker';
@@ -32,9 +30,9 @@ import { HelpCenterPage } from '@/features/support/HelpCenterPage';
 import { JobDetailsPage } from '@/features/jobs/JobDetailsPage';
 import { ResumeDetailsPage } from '@/features/resumes/ResumeDetailsPage';
 import { CoverLetterDetailsPage } from '@/features/cover-letter/CoverLetterDetailsPage';
-
 import { OnboardingPage } from '@/features/auth/OnboardingPage';
 import { NotificationProvider } from '@/contexts/NotificationContext';
+import { ProtectedRoute } from '@/components/ui/ProtectedRoute';
 
 const LandingPage = () => (
   <>
@@ -49,44 +47,48 @@ const LandingPage = () => (
 );
 
 function App() {
+  useEffect(() => {
+    localStorage.removeItem('device_job_api_date');
+  }, []);
+
   return (
     <Router>
       <ToastProvider />
       <NotificationProvider>
         <div className="min-h-screen bg-background-light font-sans text-text-light selection:bg-gray-900 selection:text-white overflow-x-hidden">
-
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/my-resumes" element={<MyResumesPage />} />
-          <Route path="/resumes/:id" element={<ResumeDetailsPage />} />
-          <Route path="/resume-builder" element={<ResumeBuilderPage />} />
-          <Route path="/cover-letter-builder" element={<CoverLetterBuilderPage />} />
-          <Route path="/cover-letters/:id" element={<CoverLetterDetailsPage />} />
-          <Route path="/ats-analyzer" element={<ATSAnalyzerPage />} />
-          <Route path="/jobs" element={<JobMatchesPage />} />
-          <Route path="/jobs/:id" element={<JobDetailsPage />} />
-          <Route path="/mock-interview" element={<MockInterviewPage />} />
-          <Route path="/mock-interview/configure" element={<InterviewConfigurationPage />} />
-          <Route path="/mock-interview/session" element={<ActiveInterviewSession />} />
-          <Route path="/mock-interview/results" element={<InterviewResultsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/settings/account" element={<AccountPage />} />
-          <Route path="/settings/notifications" element={<NotificationsPage />} />
-          <Route path="/settings/billing" element={<BillingPage />} />
-          <Route path="/help" element={<HelpCenterPage />} />
+
+          {/* Protected Routes */}
+          <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          <Route path="/my-resumes" element={<ProtectedRoute><MyResumesPage /></ProtectedRoute>} />
+          <Route path="/resumes/:id" element={<ProtectedRoute><ResumeDetailsPage /></ProtectedRoute>} />
+          <Route path="/resume-builder" element={<ProtectedRoute><ResumeBuilderPage /></ProtectedRoute>} />
+          <Route path="/cover-letter-builder" element={<ProtectedRoute><CoverLetterBuilderPage /></ProtectedRoute>} />
+          <Route path="/cover-letters/:id" element={<ProtectedRoute><CoverLetterDetailsPage /></ProtectedRoute>} />
+          <Route path="/ats-analyzer" element={<ProtectedRoute><ATSAnalyzerPage /></ProtectedRoute>} />
+          <Route path="/jobs" element={<ProtectedRoute><JobMatchesPage /></ProtectedRoute>} />
+          <Route path="/jobs/:id" element={<ProtectedRoute><JobDetailsPage /></ProtectedRoute>} />
+          <Route path="/mock-interview" element={<ProtectedRoute><MockInterviewPage /></ProtectedRoute>} />
+          <Route path="/mock-interview/configure" element={<ProtectedRoute><InterviewConfigurationPage /></ProtectedRoute>} />
+          <Route path="/mock-interview/session" element={<ProtectedRoute><ActiveInterviewSession /></ProtectedRoute>} />
+          <Route path="/mock-interview/results" element={<ProtectedRoute><InterviewResultsPage /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+          <Route path="/settings/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+          <Route path="/settings/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+          <Route path="/settings/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
+          <Route path="/help" element={<ProtectedRoute><HelpCenterPage /></ProtectedRoute>} />
+          <Route path="*" element={<DashboardPage />} />
         </Routes>
         </div>
       </NotificationProvider>
     </Router>
   )
 }
-
-
-
 
 export default App

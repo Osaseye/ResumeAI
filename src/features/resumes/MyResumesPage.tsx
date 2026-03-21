@@ -34,6 +34,32 @@ export const MyResumesPage = () => {
         }
     }, [tabParam]);
 
+    const handleDeleteResume = async (id: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        if (window.confirm('Are you sure you want to delete this resume?')) {
+            try {
+                await resumeService.deleteResume(id);
+                setResumes(resumes.filter(r => r.id !== id));
+                toast.success("Resume deleted");
+            } catch (error) {
+                toast.error("Failed to delete resume");
+            }
+        }
+    };
+
+    const handleDeleteCoverLetter = async (id: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        if (window.confirm('Are you sure you want to delete this cover letter?')) {
+            try {
+                await coverLetterService.deleteCoverLetter(id);
+                setCoverLetters(coverLetters.filter(c => c.id !== id));
+                toast.success("Cover letter deleted");
+            } catch (error) {
+                toast.error("Failed to delete cover letter");
+            }
+        }
+    };
+
     const handleTabChange = (tab: 'resumes' | 'cover-letters') => {
         setActiveTab(tab);
         setSearchParams({ tab });
@@ -173,9 +199,9 @@ export const MyResumesPage = () => {
                 <div key={resume.id} className="relative bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow flex flex-col justify-between h-[400px]">
                     <div>
                         <div className="flex justify-between items-start mb-4">
-                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold uppercase">ATS: 85</span>
-                            <button className="text-gray-400 hover:text-gray-600">
-                                <span className="material-symbols-outlined">more_vert</span>
+                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold uppercase">ATS: {resume.atsScore || 'N/A'}</span>
+                            <button onClick={(e) => handleDeleteResume(resume.id, e)} className="text-gray-400 hover:text-red-600">
+                                <span className="material-symbols-outlined">delete</span>
                             </button>
                         </div>
                         <h3 className="text-xl font-bold text-gray-900 mb-1 line-clamp-2">{resume.title || 'Untitled Resume'}</h3>
@@ -226,8 +252,8 @@ export const MyResumesPage = () => {
                         <div>
                              <div className="flex justify-between items-start mb-4">
                                 <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-bold uppercase">Draft</span>
-                                <button className="text-gray-400 hover:text-gray-600">
-                                    <span className="material-symbols-outlined">more_vert</span>
+                                <button onClick={(e) => handleDeleteCoverLetter(letter.id, e)} className="text-gray-400 hover:text-red-600">
+                                    <span className="material-symbols-outlined">delete</span>
                                 </button>
                             </div>
                             <h3 className="text-xl font-bold text-gray-900 mb-1 line-clamp-2">{letter.title || 'Untitled'}</h3>

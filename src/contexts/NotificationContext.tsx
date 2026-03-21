@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, type ReactNode, useEffect } from 'react';
 import { toast } from 'sonner';
+import { storage } from '@/utils/storage';
 
 export type NotificationType = 'success' | 'error' | 'info' | 'warning';
 
@@ -28,7 +29,7 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   const [notifications, setNotifications] = useState<Notification[]>(() => {
       // Load from local storage for persistence
-      const saved = localStorage.getItem('user_notifications');
+      const saved = storage.getItem('user_notifications');
       return saved ? JSON.parse(saved, (key, value) => {
           if (key === 'timestamp') return new Date(value);
           return value;
@@ -36,7 +37,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   });
 
   useEffect(() => {
-      localStorage.setItem('user_notifications', JSON.stringify(notifications));
+      storage.setItem('user_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
   const unreadCount = notifications.filter(n => !n.read).length;

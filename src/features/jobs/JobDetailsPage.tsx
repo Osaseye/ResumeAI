@@ -79,7 +79,7 @@ export const JobDetailsPage = () => {
                                         </span>
                                         <span className="flex items-center gap-1.5 font-medium">
                                             <span className="material-symbols-outlined text-[20px]">location_on</span>
-                                            {job.job_city}, {job.job_country}
+                                            {[job.job_city, job.job_country].filter(Boolean).join(', ')}
                                         </span>
                                         <span className="flex items-center gap-1.5 font-medium">
                                             <span className="material-symbols-outlined text-[20px]">schedule</span>

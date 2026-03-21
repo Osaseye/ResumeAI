@@ -34,9 +34,8 @@ service firebase.storage {
 
     // 1. Profile Pictures
     match /users/{userId}/profile/{allPaths=**} {
-      // READ: Anyone can read profile pictures (if public profiles feature exists)
-      // If private, change to: allow read: if isAuthenticated();
-      allow read: if true; 
+      // READ: Only authenticated users can read profile pictures
+      allow read: if isAuthenticated(); 
 
       // WRITE: Only owner can upload, update, delete
       allow write: if isOwner(userId) 

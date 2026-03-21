@@ -1,4 +1,4 @@
-import { model } from '@/lib/firebase';
+import { getModel } from '@/lib/firebase';
 import type { ResumeFormData } from '@/features/resumes/types';
 // import { GenerateContentResult } from 'firebase/ai';
 
@@ -14,12 +14,13 @@ export const vertexService = {
         `;
 
         try {
-            const result = await model.generateContent(prompt);
+            const result = await getModel().generateContent(prompt);
             const response = result.response;
             const text = response.text();
             
             // Extract JSON from response (handle potential markdown blocks)
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            const clean = text.replace(/```json|```/g, '').trim();
+            const jsonMatch = clean.match(/\{[\s\S]*\}/);
             if (!jsonMatch) {
                 throw new Error("Failed to parse AI response as JSON");
             }
@@ -61,11 +62,12 @@ export const vertexService = {
         `;
 
         try {
-            const result = await model.generateContent(prompt);
+            const result = await getModel().generateContent(prompt);
             const response = result.response;
             const text = response.text();
             
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            const clean = text.replace(/```json|```/g, '').trim();
+            const jsonMatch = clean.match(/\{[\s\S]*\}/);
             if (!jsonMatch) {
                 throw new Error("Failed to parse AI response as JSON");
             }
@@ -93,11 +95,12 @@ export const vertexService = {
         `;
 
         try {
-            const result = await model.generateContent(prompt);
+            const result = await getModel().generateContent(prompt);
             const response = result.response;
             const text = response.text();
             
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            const clean = text.replace(/```json|```/g, '').trim();
+            const jsonMatch = clean.match(/\{[\s\S]*\}/);
             if (!jsonMatch) {
                 throw new Error("Failed to parse AI response as JSON");
             }
@@ -170,11 +173,12 @@ export const vertexService = {
         `;
 
         try {
-            const result = await model.generateContent(prompt);
+            const result = await getModel().generateContent(prompt);
             const response = result.response;
             const text = response.text();
              // Extract JSON from response (handle potential markdown blocks)
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            const clean = text.replace(/```json|```/g, '').trim();
+            const jsonMatch = clean.match(/\{[\s\S]*\}/);
             if (!jsonMatch) {
                 throw new Error("Failed to parse AI response as JSON");
             }
@@ -214,11 +218,12 @@ export const vertexService = {
         `;
 
         try {
-            const result = await model.generateContent(prompt);
+            const result = await getModel().generateContent(prompt);
             const response = result.response;
             const text = response.text();
              // Extract JSON from response (handle potential markdown blocks)
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            const clean = text.replace(/```json|```/g, '').trim();
+            const jsonMatch = clean.match(/\{[\s\S]*\}/);
             if (!jsonMatch) {
                 throw new Error("Failed to parse AI response as JSON");
             }
@@ -269,7 +274,7 @@ export const vertexService = {
 
         try {
             console.log("Sending prompt to AI model...");
-            const result = await model.generateContent(prompt);
+            const result = await getModel().generateContent(prompt);
             console.log("Received response from AI model.");
             
             const response = result.response;
@@ -277,7 +282,8 @@ export const vertexService = {
             console.log("Raw AI Response Text:", text);
 
              // Extract JSON from response (handle potential markdown blocks)
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            const clean = text.replace(/```json|```/g, '').trim();
+            const jsonMatch = clean.match(/\{[\s\S]*\}/);
             if (!jsonMatch) {
                 console.error("Failed to find JSON in response:", text);
                 throw new Error("Failed to parse AI response as JSON");
@@ -319,9 +325,10 @@ export const vertexService = {
         `;
 
         try {
-            const result = await model.generateContent(prompt);
+            const result = await getModel().generateContent(prompt);
             const text = result.response.text();
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            const clean = text.replace(/```json|```/g, '').trim();
+            const jsonMatch = clean.match(/\{[\s\S]*\}/);
             if (!jsonMatch) throw new Error("Failed to parse start interview response");
             return JSON.parse(jsonMatch[0]);
         } catch (error) {
@@ -361,9 +368,10 @@ export const vertexService = {
         `;
 
         try {
-            const result = await model.generateContent(prompt);
+            const result = await getModel().generateContent(prompt);
             const text = result.response.text();
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            const clean = text.replace(/```json|```/g, '').trim();
+            const jsonMatch = clean.match(/\{[\s\S]*\}/);
             if (!jsonMatch) throw new Error("Failed to parse chat interview response");
             return JSON.parse(jsonMatch[0]);
         } catch (error) {
@@ -400,9 +408,10 @@ export const vertexService = {
         `;
 
         try {
-            const result = await model.generateContent(prompt);
+            const result = await getModel().generateContent(prompt);
             const text = result.response.text();
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            const clean = text.replace(/```json|```/g, '').trim();
+            const jsonMatch = clean.match(/\{[\s\S]*\}/);
             if (!jsonMatch) throw new Error("Failed to parse interview feedback");
             return JSON.parse(jsonMatch[0]);
         } catch (error) {
@@ -418,3 +427,4 @@ export const vertexService = {
         }
     }
 };
+

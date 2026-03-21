@@ -1,6 +1,7 @@
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { storage } from '@/utils/storage';
 
 interface InterviewSession {
   id?: string;
@@ -28,7 +29,7 @@ export const MockInterviewPage = () => {
   });
 
   useEffect(() => {
-    const storedStats = localStorage.getItem('interview_stats');
+    const storedStats = storage.getItem('interview_stats');
     if (storedStats) {
       try {
         setStats(JSON.parse(storedStats));

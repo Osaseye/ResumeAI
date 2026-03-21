@@ -5,6 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { AuthLayout } from '@/layouts/AuthLayout';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -38,18 +40,16 @@ const ForgotPasswordForm = () => {
   const onSubmit = async (data: ForgotPasswordFormData) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
+      await sendPasswordResetEmail(auth, data.email);
+
       console.log('Reset request for:', data);
       toast.success('Reset link sent!', {
         description: 'Check your email for instructions to reset your password.',
       });
-      // Navigate users back to login so they can login after resetting (or just waiting)
       navigate('/login');
-    } catch (error) {
+    } catch (error: any) {
       toast.error('Request failed', {
-        description: 'Something went wrong. Please try again.',
+        description: error.message || 'Something went wrong. Please try again.',
       });
     } finally {
       setIsLoading(false);

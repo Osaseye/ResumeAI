@@ -56,6 +56,7 @@ export interface Resume {
       description: string;
       url?: string;
   }[];
+  atsScore?: number;
 }
 
 export type ResumeFormData = Omit<Resume, 'id' | 'userId' | 'createdAt' | 'updatedAt'>;

@@ -127,6 +127,27 @@ export const ResumeBuilderPage = () => {
         return isValid;
     };
 
+    const handleAutoGenerateSummary = async () => {
+        try {
+            const toastId = toast.loading("Generating summary with AI...");
+            try {
+                // Pass current form data so the AI has context
+                const result = await vertexService.enhanceResume(formData);
+                if (result && result.summary) {
+                    setFormData(prev => ({ ...prev, summary: result.summary }));
+                    toast.success("Summary generated successfully!", { id: toastId });
+                } else {
+                     toast.error("AI returned an empty summary.", { id: toastId });
+                }
+            } catch (aiError) {
+                console.error("AI Generation failed:", aiError);
+                toast.error("Failed to generate summary", { id: toastId });
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
     const handleSave = async () => {
         if (!user) {
             toast.error("You must be logged in to save.");
@@ -725,7 +746,10 @@ export const ResumeBuilderPage = () => {
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" 
                                         placeholder="Write 2-4 sentences summarizing your experience and top achievements..."
                                     ></textarea>
-                                    <button className="mt-4 flex items-center gap-2 text-sm font-semibold text-purple-700 hover:text-purple-800">
+                                    <button 
+                                        onClick={handleAutoGenerateSummary}
+                                        className="mt-4 flex items-center gap-2 text-sm font-semibold text-purple-700 hover:text-purple-800"
+                                    >
                                         <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
                                         Auto-Generate with AI
                                     </button>

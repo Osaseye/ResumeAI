@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { onAuthStateChanged, signOut as firebaseSignOut, setPersistence, browserSessionPersistence } from 'firebase/auth';
+import { onAuthStateChanged, signOut as firebaseSignOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
+import { storage } from '@/utils/storage';
 
 interface AuthContextType {
   user: User | null;
@@ -21,9 +22,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const initializeAuth = async () => {
         try {
-            // Configure to use Session persistence (per tab)
-            // This allows multiple users to be logged in on different tabs
-            await setPersistence(auth, browserSessionPersistence);
+            // Configure to use Local persistence 
+            await setPersistence(auth, browserLocalPersistence);
         } catch (error) {
             console.error("Error setting auth persistence:", error);
         }
@@ -43,14 +43,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     // Clear potentially leaky local storage keys on explicit logout
-    localStorage.removeItem('dashboard_stats_cache');
-    localStorage.removeItem('dashboard_profile_cache');
-    localStorage.removeItem('dashboard_jobs_cache');
-    localStorage.removeItem('interview_stats');
-    localStorage.removeItem('saved_jobs_data'); 
-    localStorage.removeItem('onboarding_data');
-    
-    await firebaseSignOut(auth);
+    storage.removeItem('dashboard_stats_cache');
+    storage.removeItem('dashboard_profile_cache');
+    storage.removeItem('dashboard_jobs_cache');
+    storage.removeItem('interview_stats');
+    storage.removeItem('saved_jobs_data'); 
+    storage.removeItem('onboarding_data');
   };
 
   return (

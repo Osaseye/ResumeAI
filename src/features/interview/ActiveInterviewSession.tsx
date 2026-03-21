@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
 import { vertexService } from '@/features/ai/services/vertexService';
+import { storage } from '@/utils/storage';
 
 interface Message {
   id: string;
@@ -53,7 +54,7 @@ export const ActiveInterviewSession = () => {
           const feedback = await vertexService.generateInterviewFeedback(history);
           
           // Save Stats to LocalStorage (Simulating Backend)
-          const statsStr = localStorage.getItem('interview_stats');
+          const statsStr = storage.getItem('interview_stats');
           let stats = statsStr ? JSON.parse(statsStr) : { averageScore: 0, totalInterviews: 0, history: [] };
           
           // Update Stats
@@ -72,7 +73,7 @@ export const ActiveInterviewSession = () => {
               messages: currentMessages
           });
           
-          localStorage.setItem('interview_stats', JSON.stringify(stats));
+          storage.setItem('interview_stats', JSON.stringify(stats));
           
           // Navigate to Results
           toast.success("Analysis Complete!");

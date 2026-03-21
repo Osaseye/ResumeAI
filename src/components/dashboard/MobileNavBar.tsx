@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 const NAV_ITEMS = [
     { label: 'Dashboard', icon: 'dashboard', path: '/dashboard' },
     { label: 'Resumes', icon: 'description', path: '/my-resumes' },
+    { label: 'Build Resume', icon: 'draw', path: '/resume-builder' },
+    { label: 'Cover Letter', icon: 'edit_document', path: '/cover-letter-builder' },
     { label: 'ATS Analysis', icon: 'analytics', path: '/ats-analyzer' },
     { label: 'Jobs', icon: 'work', path: '/jobs' },
     { label: 'Interview', icon: 'mic', path: '/mock-interview' },
@@ -13,7 +15,7 @@ export const MobileNavBar = () => {
     const location = useLocation();
 
     return (
-        <div className="md:hidden fixed bottom-6 left-4 right-4 bg-white/70 backdrop-blur-2xl rounded-2xl shadow-xl z-50 flex items-center justify-around px-2 py-3 border border-white/20">
+        <div className="md:hidden fixed bottom-6 left-4 right-4 bg-white/70 backdrop-blur-2xl rounded-2xl shadow-xl z-50 flex items-center justify-around px-2 py-3 border border-white/20 overflow-x-auto gap-4 hide-scrollbar">
             {NAV_ITEMS.map((item) => {
                 const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
                 return (

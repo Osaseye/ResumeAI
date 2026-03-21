@@ -132,15 +132,13 @@ export const CoverLetterDetailsPage = () => {
                     @page { margin: 0; }
                     body * { visibility: hidden; }
                     .print-content, .print-content * { visibility: visible; }
-                    .print-content { 
-                        position: absolute; 
-                        left: 0; 
-                        top: 0; 
-                        width: 100%; 
+                    .print-content {
+                        position: static;
+                        width: 100%;
                         max-width: 100%;
                         height: auto; 
-                        margin: 0; 
-                        padding: 2cm; 
+                        margin: 0;
+                        padding: 2cm;
                         background: white;
                         border: none;
                         overflow: visible;

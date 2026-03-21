@@ -33,6 +33,12 @@ export const HelpCenterPage = () => {
         subject: 'General Inquiry',
         message: ''
     });
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filteredFaqs = FAQS.filter(
+        item => item.question.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                item.answer.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     const toggleFaq = (index: number) => {
         setOpenIndex(openIndex === index ? null : index);
@@ -139,6 +145,8 @@ export const HelpCenterPage = () => {
                     <span className="absolute left-4 top-3.5 text-gray-400 material-symbols-outlined">search</span>
                     <input 
                         type="text" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search for articles..." 
                         className="w-full pl-12 pr-4 py-3 rounded-full border border-gray-300 focus:ring-2 focus:ring-black focus:border-transparent shadow-sm"
                     />
@@ -175,7 +183,7 @@ export const HelpCenterPage = () => {
             <div className="bg-gray-50 rounded-2xl p-8 mb-8 max-w-4xl mx-auto">
                 <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Frequently Asked Questions</h2>
                 <div className="space-y-4">
-                    {FAQS.map((item, i) => (
+                    {filteredFaqs.map((item, i) => (
                         <div key={i} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                             <button 
                                 onClick={() => toggleFaq(i)}

@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { jobsService } from '@/features/jobs/services/jobService';
 
 export const Sidebar = () => {
     const location = useLocation();
@@ -8,21 +9,9 @@ export const Sidebar = () => {
     // Fetch job count for the badge
     useEffect(() => {
         const fetchCount = async () => {
-             // In a real app we might have a dedicated lightweight endpoint for counts,
-             // or check a "new since last visit" timestamp.
-             // For now, let's just create a slight delay to not block rendering
-             // and fetch the default list to get a count.
             try {
-                // We'll just define a small number for now to avoid calling the paid API on every page load 
-                // while developing the sidebar, or we fetch it once.
-                
-                // UNCOMMENT THIS to fetch real count (consuming API credits)
-                // const jobs = await jobsService.searchJobs("Software Engineer", "Nigeria");
-                // setJobCount(jobs.length);
-                
-                // For now, let's simulated a stored count or notification
-                setJobCount(14); 
-
+                const jobs = jobsService.getStoredJobs();
+                setJobCount(jobs.length || 0); 
             } catch (e) {
                 console.error("Failed to fetch sidebar job count", e);
             }

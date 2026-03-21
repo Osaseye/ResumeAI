@@ -4,6 +4,10 @@ import { toast } from 'sonner';
 import { useAuth } from '@/features/auth/AuthContext';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { updatePassword, reauthenticateWithCredential, EmailAuthProvider, updateProfile } from 'firebase/auth';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
+import { useRef } from 'react';
 
 export const AccountPage = () => {
   const { user } = useAuth();
@@ -64,13 +68,46 @@ export const AccountPage = () => {
     }
   };
 
-  const handleUpdatePassword = () => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    try {
+      const toastId = toast.loading('Uploading avatar...');
+      const storageRef = ref(storage, `users/${user.uid}/profile/avatar.png`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      await updateProfile(user, { photoURL: downloadURL });
+      
+      toast.success('Avatar updated successfully', { id: toastId });
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error('Failed to upload avatar');
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!user || !user.email) return;
     if (formData.newPassword !== formData.confirmPassword) {
       toast.error('Passwords do not match');
       return;
     }
-    toast.success('Password updated successfully');
-    setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
+    
+    try {
+      const credential = EmailAuthProvider.credential(user.email, formData.currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, formData.newPassword);
+      
+      toast.success('Password updated successfully');
+      setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
+    } catch (error: any) {
+      console.error("Error updating password:", error);
+      toast.error(error.message || 'Failed to update password');
+    }
   };
 
   return (
@@ -84,10 +121,28 @@ export const AccountPage = () => {
           <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h2 className="text-xl font-semibold mb-6">Personal Information</h2>
             <div className="flex items-center gap-6 mb-8">
-              <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-2xl">
-                {formData.fullName ? formData.fullName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : <span className="material-symbols-outlined text-4xl">person</span>}
+              <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-2xl overflow-hidden">
+                {user?.photoURL ? (
+                    <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                ) : formData.fullName ? (
+                    formData.fullName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)
+                ) : (
+                    <span className="material-symbols-outlined text-4xl">person</span>
+                )}
               </div>
-              <button className="text-indigo-600 font-medium text-sm hover:underline">Change Avatar</button>
+              <input 
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                ref={fileInputRef} 
+                onChange={handleAvatarChange} 
+              />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="text-indigo-600 font-medium text-sm hover:underline"
+              >
+                Change Avatar
+              </button>
             </div>
             
             <div className="space-y-4">

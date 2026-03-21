@@ -111,6 +111,10 @@ export const OnboardingPage = () => {
 
   const nextStep = () => {
     // Basic validation per step could be added here
+    if (step === 2 && !selectedLevel) {
+      toast.error('Please select your experience level to continue.');
+      return;
+    }
     setStep((prev) => prev + 1);
   };
 

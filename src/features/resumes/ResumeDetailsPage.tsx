@@ -129,7 +129,7 @@ export const ResumeDetailsPage = () => {
                                 <p className="text-sm text-gray-500">Last edited {new Date(resume.updatedAt).toLocaleDateString()}</p>
                             </div>
                             <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-200 w-fit">
-                                ATS Score: 85
+                                ATS Score: {resume.atsScore || 'N/A'}
                             </span>
                         </div>
                     </div>
@@ -148,7 +148,7 @@ export const ResumeDetailsPage = () => {
                             <option value="tech">Tech</option>
                         </select>
                         <div className="flex gap-3">
-                            <button className="flex-1 md:flex-none justify-center px-4 py-2 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50 flex items-center gap-2 text-sm whitespace-nowrap">
+                            <button onClick={() => window.print()} className="flex-1 md:flex-none justify-center px-4 py-2 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50 flex items-center gap-2 text-sm whitespace-nowrap">
                                 <span className="material-symbols-outlined text-sm">download</span>
                                 Download PDF
                             </button>
