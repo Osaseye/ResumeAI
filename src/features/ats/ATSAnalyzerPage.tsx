@@ -8,7 +8,7 @@ import { vertexService } from '@/features/ai/services/vertexService';
 import { resumeService } from '@/features/resumes/services/resumeService';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ResumePreview } from '@/features/resumes/components/ResumePreview';
-import type { ResumeFormData } from '@/features/resumes/types';
+import type { ResumeFormData, Resume } from '@/features/resumes/types';
 
 interface ATSAnalysisResult {
     score: number;
@@ -114,13 +114,13 @@ export const ATSAnalyzerPage = () => {
             } else if (selectedResumeId) {
                 const selected = savedResumes.find(r => r.id === selectedResumeId);
                 if (selected) {
-                    resumeText = `${selected.personalInfo?.fullName || ''}\n`;
-                    resumeText += `${selected.personalInfo?.email || ''} | ${selected.personalInfo?.phone || ''}\n\n`;
-                    if (selected.professionalSummary) resumeText += `Summary\n${selected.professionalSummary}\n\n`;
+                    resumeText = `${selected.contact?.fullName || ''}\n`;
+                    resumeText += `${selected.contact?.email || ''} | ${selected.contact?.phone || ''}\n\n`;
+                    if (selected.summary) resumeText += `Summary\n${selected.summary}\n\n`;
                     if (selected.experience) {
                         resumeText += `Experience\n`;
                         selected.experience.forEach(exp => {
-                            resumeText += `${exp.jobTitle} at ${exp.company} (${exp.startDate} - ${exp.endDate || 'Present'})\n${exp.description}\n\n`;
+                            resumeText += `${exp.role} at ${exp.company} (${exp.startDate} - ${exp.endDate || 'Present'})\n${exp.description}\n\n`;
                         });
                     }
                     if (selected.education) {
@@ -129,7 +129,7 @@ export const ATSAnalyzerPage = () => {
                             resumeText += `${edu.degree} in ${edu.field} from ${edu.school}\n\n`;
                         });
                     }
-                    if (selected.skills) resumeText += `Skills\n${selected.skills.join(', ')}\n\n`;
+                    if (selected.skills) resumeText += `Skills\n${selected.skills.map(s => s.name).join(', ')}\n\n`;
                 }
             }
             
@@ -211,7 +211,7 @@ export const ATSAnalyzerPage = () => {
                                             onClick={() => { setSelectedResumeId(r.id); setFile(null); }}
                                             className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedResumeId === r.id ? 'border-purple-600 bg-purple-50' : 'border-gray-100 hover:border-purple-200'}`}
                                         >
-                                            <h4 className="font-semibold text-gray-900">{r.title || r.personalInfo?.fullName || 'Untitled Resume'}</h4>
+                                            <h4 className="font-semibold text-gray-900">{r.title || r.contact?.fullName || 'Untitled Resume'}</h4>
                                             <p className="text-xs text-gray-500 mt-1">Last edited: {new Date(r.updatedAt).toLocaleDateString()}</p>
                                         </div>
                                     ))}
