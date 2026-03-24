@@ -99,7 +99,7 @@ export const JobMatchesPage = () => {
           </h1>
           <p className="text-gray-500 mt-2">
             {view === 'matches' 
-              ? 'AI-curated opportunities in the Nigerian tech ecosystem.' 
+              ? 'AI-curated opportunities in the tech ecosystem.' 
               : 'Your shortlisted opportunities.'}
           </p>
         </div>

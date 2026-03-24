@@ -34,6 +34,8 @@ export const ATSAnalyzerPage = () => {
     const [optimizedResume, setOptimizedResume] = useState<ResumeFormData | null>(null);
     const [originalText, setOriginalText] = useState<string>('');
     const [isSaving, setIsSaving] = useState(false);
+    const [savedResumes, setSavedResumes] = useState<Resume[]>([]);
+    const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
 
     useEffect(() => {
         if (location.state?.jobDescription) {
@@ -41,9 +43,23 @@ export const ATSAnalyzerPage = () => {
         }
     }, [location.state]);
 
+    useEffect(() => {
+        if (!user) return;
+        const loadResumes = async () => {
+            try {
+                const resumes = await resumeService.getUserResumes(user.uid);
+                setSavedResumes(resumes);
+            } catch (error) {
+                console.error("Failed to load resumes:", error);
+            }
+        };
+        loadResumes();
+    }, [user]);
+
     const onDrop = (acceptedFiles: File[]) => {
         if (acceptedFiles.length > 0) {
             setFile(acceptedFiles[0]);
+            setSelectedResumeId(null);
         }
     };
 
@@ -83,15 +99,40 @@ export const ATSAnalyzerPage = () => {
     };
 
     const handleAnalyze = async () => {
-        if (!file || !jobDescription.trim()) {
+        if ((!file && !selectedResumeId) || !jobDescription.trim()) {
             toast.error("Please provide both a resume and a job description.");
             return;
         }
 
         setAnalyzing(true);
         try {
+            let resumeText = '';
+            
             // 1. Extract text from resume
-            const resumeText = await fileParser.extractText(file);
+            if (file) {
+                resumeText = await fileParser.extractText(file);
+            } else if (selectedResumeId) {
+                const selected = savedResumes.find(r => r.id === selectedResumeId);
+                if (selected) {
+                    resumeText = `${selected.personalInfo?.fullName || ''}\n`;
+                    resumeText += `${selected.personalInfo?.email || ''} | ${selected.personalInfo?.phone || ''}\n\n`;
+                    if (selected.professionalSummary) resumeText += `Summary\n${selected.professionalSummary}\n\n`;
+                    if (selected.experience) {
+                        resumeText += `Experience\n`;
+                        selected.experience.forEach(exp => {
+                            resumeText += `${exp.jobTitle} at ${exp.company} (${exp.startDate} - ${exp.endDate || 'Present'})\n${exp.description}\n\n`;
+                        });
+                    }
+                    if (selected.education) {
+                        resumeText += `Education\n`;
+                        selected.education.forEach(edu => {
+                            resumeText += `${edu.degree} in ${edu.field} from ${edu.school}\n\n`;
+                        });
+                    }
+                    if (selected.skills) resumeText += `Skills\n${selected.skills.join(', ')}\n\n`;
+                }
+            }
+            
             setOriginalText(resumeText);
             
             // 2. Analyze with AI
@@ -132,36 +173,64 @@ export const ATSAnalyzerPage = () => {
                 </div>
 
                 {step === 1 && (
-                     <div className="bg-white rounded-3xl shadow-soft p-12 text-center border-2 border-dashed border-gray-200 hover:border-blue-500 transition-colors cursor-pointer" {...getRootProps()}>
-                        <input {...getInputProps()} />
-                        <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                             <span className="material-symbols-outlined text-4xl">cloud_upload</span>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className={`bg-white rounded-3xl shadow-soft p-12 text-center border-2 border-dashed transition-colors cursor-pointer ${file ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-blue-500'}`} {...getRootProps()}>
+                            <input {...getInputProps()} />
+                            <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                                 <span className="material-symbols-outlined text-4xl">cloud_upload</span>
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                {isDragActive ? "Drop your resume here" : "Upload new resume"}
+                            </h3>
+                            {file ? (
+                                 <div className="mt-4 p-4 bg-white rounded-xl inline-flex items-center gap-3 border border-purple-200">
+                                    <span className="material-symbols-outlined text-purple-600">description</span>
+                                    <span className="font-medium text-gray-900">{file.name}</span>
+                                    <button onClick={(e) => { e.stopPropagation(); setFile(null); }} className="text-gray-400 hover:text-red-500 ml-2">
+                                        <span className="material-symbols-outlined">close</span>
+                                    </button>
+                                 </div>
+                            ) : (
+                                <p className="text-gray-500 max-w-sm mx-auto">
+                                    Drag and drop your PDF or DOCX file here, or click to browse.
+                                    <br/><span className="text-sm mt-2 block text-gray-400">Max file size: 5MB</span>
+                                </p>
+                            )}
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">
-                            {isDragActive ? "Drop your resume here" : "Upload your resume"}
-                        </h3>
-                        {file ? (
-                             <div className="mt-4 p-4 bg-gray-50 rounded-xl inline-flex items-center gap-3">
-                                <span className="material-symbols-outlined text-gray-500">description</span>
-                                <span className="font-medium text-gray-900">{file.name}</span>
-                                <button onClick={(e) => { e.stopPropagation(); setFile(null); }} className="text-gray-400 hover:text-red-500 ml-2">
-                                    <span className="material-symbols-outlined">close</span>
-                                </button>
-                             </div>
-                        ) : (
-                            <p className="text-gray-500 max-w-sm mx-auto">
-                                Drag and drop your PDF or DOCX file here, or click to browse.
-                                <br/><span className="text-sm mt-2 block text-gray-400">Max file size: 5MB</span>
-                            </p>
-                        )}
                         
-                        {file && (
-                            <div className="mt-8">
+                        <div className="bg-white rounded-3xl shadow-soft p-8 border border-gray-100 flex flex-col items-center">
+                            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-purple-600">file_copy</span>
+                                Or Select Saved Resume
+                            </h3>
+                            {savedResumes.length > 0 ? (
+                                <div className="w-full space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {savedResumes.map(r => (
+                                        <div 
+                                            key={r.id} 
+                                            onClick={() => { setSelectedResumeId(r.id); setFile(null); }}
+                                            className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedResumeId === r.id ? 'border-purple-600 bg-purple-50' : 'border-gray-100 hover:border-purple-200'}`}
+                                        >
+                                            <h4 className="font-semibold text-gray-900">{r.title || r.personalInfo?.fullName || 'Untitled Resume'}</h4>
+                                            <p className="text-xs text-gray-500 mt-1">Last edited: {new Date(r.updatedAt).toLocaleDateString()}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center p-6 bg-gray-50 rounded-2xl w-full text-gray-500 h-full flex flex-col items-center justify-center">
+                                    <p>No saved resumes found.</p>
+                                    <button onClick={() => navigate('/builder')} className="mt-4 px-4 py-2 bg-white text-black text-sm font-medium rounded-lg border border-gray-200 shadow-sm hover:bg-gray-50">Create One Now</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {(file || selectedResumeId) && (
+                            <div className="md:col-span-2 mt-4 flex justify-center">
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); setStep(2); }}
-                                    className="bg-black text-white px-8 py-3 rounded-full font-medium hover:bg-gray-800 transition-all shadow-lg"
+                                    className="bg-black text-white px-8 py-3 rounded-full font-medium hover:bg-gray-800 transition-all shadow-lg flex items-center gap-2"
                                 >
-                                    {jobDescription ? "Continue with Loaded Job Description" : "Continue to Job Targeting"}
+                                    {jobDescription ? "Continue with Loaded Job Description" : "Continue to Job Targeting"} <span className="material-symbols-outlined text-sm">arrow_forward</span>
                                 </button>
                             </div>
                         )}
@@ -239,7 +308,7 @@ export const ATSAnalyzerPage = () => {
                             </div>
                             
                             <button 
-                                onClick={() => { setStep(1); setFile(null); setJobDescription(''); setResult(null); }}
+                                onClick={() => { setStep(1); setFile(null); setSelectedResumeId(null); setJobDescription(''); setResult(null); }}
                                 className="w-full py-3 border border-gray-200 rounded-xl font-medium text-gray-600 hover:bg-gray-50 block"
                             >
                                 Analyze Another
